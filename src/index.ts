@@ -46,6 +46,14 @@ app.onError((err, c) => {
 const PORT = Number(process.env["PORT"] ?? 3000);
 
 async function main() {
+  // Validate required API keys before starting
+  const googleKey = process.env["GOOGLE_API_KEY"] ?? process.env["GOOGLE_GENERATIVE_AI_API_KEY"];
+  if (!googleKey) {
+    throw new Error(
+      "Missing GOOGLE_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY — required for embeddings and LLM"
+    );
+  }
+
   // Ensure pgvector extension is installed
   await ensurePgVector();
   console.log("[startup] pgvector extension ready");

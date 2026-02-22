@@ -66,7 +66,8 @@ export async function processDocument(
         chunkValues.push({
           documentId,
           content: chunkData.content,
-          embedding: embedding as unknown as string[], // Drizzle vector type
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          embedding: embedding as unknown as any, // pgvector: number[] at runtime; Drizzle vector column type mismatch
           chunkMetadata: chunkData.metadata,
         });
       }
@@ -91,7 +92,7 @@ export async function processDocument(
 
     await db
       .update(documents)
-      .set({ status: "failed", metadata: { error: errorMessage } })
+      .set({ status: "failed", metadata: { ...(loaded.metadata as Record<string, unknown>), error: errorMessage } })
       .where(eq(documents.id, documentId));
 
     return {

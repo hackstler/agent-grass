@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { ragConfig } from "../../config/rag.config.js";
+import { transformQuery } from "../../rag/query-transformer.js";
 import type { ToolEntry, ToolRegistryDeps } from "./base.js";
 
 const chunkSchema = z.object({
@@ -47,6 +48,42 @@ Returns the most relevant text passages ranked by relevance score.`,
       };
 
       let chunks = await retriever.retrieve(embedding, retrieverOptions);
+
+      // Query expansion: when configured and initial retrieval is insufficient (< 3 chunks).
+      // Uses multi-query / HyDE / step-back to broaden recall before reranking.
+      if (ragConfig.queryEnhancement !== "none" && chunks.length < 3) {
+        const { GoogleGenerativeAI } = await import("@google/generative-ai");
+        const apiKey = (process.env["GOOGLE_API_KEY"] ?? process.env["GOOGLE_GENERATIVE_AI_API_KEY"])!;
+        const googleAI = new GoogleGenerativeAI(apiKey);
+        const llmModel = googleAI.getGenerativeModel({ model: ragConfig.llmModel });
+
+        const expanded = await transformQuery(
+          query,
+          ragConfig.queryEnhancement,
+          { complete: async (prompt) => (await llmModel.generateContent(prompt)).response.text() },
+          ragConfig.multiQueryCount
+        );
+
+        if (expanded.queries.length > 1) {
+          const embeddings = await Promise.all(expanded.queries.map((q) => embedder.embed(q)));
+          const expandedOpts = {
+            topK: ragConfig.enableReranking ? topK * 3 : topK,
+            similarityThreshold: ragConfig.similarityThreshold * 0.8,
+            ...(orgId ? { orgId } : {}),
+            ...(documentIds?.length ? { documentIds } : {}),
+          };
+
+          const expandedChunks = await retriever.retrieveMultiQuery(embeddings, expandedOpts);
+
+          // Merge initial + expanded results; keep highest score per chunk
+          const seen = new Map(chunks.map((c) => [c.id, c]));
+          for (const c of expandedChunks) {
+            const existing = seen.get(c.id);
+            if (!existing || c.score > existing.score) seen.set(c.id, c);
+          }
+          chunks = Array.from(seen.values()).sort((a, b) => b.score - a.score);
+        }
+      }
 
       if (ragConfig.enableReranking && chunks.length > 0) {
         chunks = await reranker.rerank(query, chunks, {

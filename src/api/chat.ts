@@ -5,6 +5,7 @@ import { ragAgent } from "../agent/index.js";
 import { db } from "../db/client.js";
 import { messages, conversations } from "../db/schema.js";
 import { eq } from "drizzle-orm";
+import { ragConfig } from "../config/rag.config.js";
 
 const chat = new Hono();
 
@@ -30,15 +31,17 @@ chat.post("/", async (c) => {
   const { query, orgId } = parsed.data;
   const conversationId = await resolveConversationId(parsed.data.conversationId);
 
-  const result = await ragAgent.generate(query, {
-    threadId: conversationId,
-    resourceId: orgId ?? "anonymous",
-  });
+  // threadId / resourceId: Mastra 1.5 Memory API — accepted at runtime,
+  // missing from the TS overloads when memory is present.
+  const result = await ragAgent.generate(
+    query,
+    { threadId: conversationId, resourceId: orgId ?? "anonymous" } as Parameters<typeof ragAgent.generate>[1]
+  );
 
   const sources = extractSources(result.steps ?? []);
 
   await persistMessages(conversationId, query, result.text, {
-    model: process.env["GEMINI_MODEL"] ?? "gemini-2.5-flash",
+    model: ragConfig.llmModel,
     retrievedChunks: sources.map((s) => s.id),
   });
 
@@ -47,7 +50,7 @@ chat.post("/", async (c) => {
     answer: result.text,
     sources,
     metadata: {
-      model: process.env["GEMINI_MODEL"] ?? "gemini-2.5-flash",
+      model: ragConfig.llmModel,
       chunksRetrieved: sources.length,
     },
   });
@@ -95,10 +98,12 @@ chat.get("/stream", async (c) => {
     const collectedSources: Array<{ id: string; documentTitle: string; documentSource: string; score: number; excerpt: string }> = [];
 
     try {
-      const agentStream = await ragAgent.stream(parsed.data.query, {
-        threadId: conversationId,
-        resourceId: orgId ?? "anonymous",
-      });
+      // threadId / resourceId: Mastra 1.5 Memory API — accepted at runtime,
+      // missing from the TS overloads when memory is present.
+      const agentStream = await ragAgent.stream(
+        parsed.data.query,
+        { threadId: conversationId, resourceId: orgId ?? "anonymous" } as Parameters<typeof ragAgent.stream>[1]
+      );
 
       for await (const chunk of agentStream.fullStream) {
         // Mastra 1.5 wraps all event data in payload
@@ -142,7 +147,7 @@ chat.get("/stream", async (c) => {
 
       if (fullAnswer) {
         await persistMessages(conversationId, parsed.data.query, fullAnswer, {
-          model: process.env["GEMINI_MODEL"] ?? "gemini-2.5-flash",
+          model: ragConfig.llmModel,
           retrievedChunks: collectedSources.map((s) => s.id),
         });
       }

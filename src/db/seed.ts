@@ -119,7 +119,8 @@ async function seed() {
       return {
         documentId: doc!.id,
         content,
-        embedding: embedding as unknown as string[],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        embedding: embedding as unknown as any, // pgvector: number[] at runtime; Drizzle vector column type mismatch
         chunkMetadata: { chunkIndex: i, tokenCount: Math.ceil(content.length / 4) },
       };
     })

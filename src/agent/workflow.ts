@@ -1,3 +1,14 @@
+/**
+ * RAG Retrieval Workflow — standalone, not used by the agent at runtime.
+ *
+ * The multi-query expansion logic here is integrated into the searchDocuments
+ * tool (src/agent/tools/search-documents.ts) which the agent calls directly.
+ *
+ * This workflow is kept for:
+ *   - Phase 2: direct /retrieve endpoint or agent.network() routing
+ *   - Testing the retrieval pipeline independently of the agent
+ *   - Reference implementation of the conditional expansion pattern
+ */
 import { createWorkflow, createStep } from "@mastra/core/workflows";
 import { z } from "zod";
 import { transformQuery } from "../rag/query-transformer.js";

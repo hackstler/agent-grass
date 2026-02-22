@@ -1,6 +1,6 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { z } from "zod";
-import { zValidator } from "@hono/zod-validator";
 import { loadDocument } from "../ingestion/loader.js";
 import { processDocument } from "../ingestion/processor.js";
 import { db } from "../db/client.js";
@@ -43,7 +43,7 @@ ingest.post("/", async (c) => {
   );
 });
 
-async function handleFileUpload(c: Parameters<Parameters<typeof ingest.post>[1]>[0]) {
+async function handleFileUpload(c: Context) {
   const body = await c.req.parseBody();
   const file = body["file"];
   const orgId = typeof body["orgId"] === "string" ? body["orgId"] : undefined;
@@ -83,7 +83,7 @@ async function handleFileUpload(c: Parameters<Parameters<typeof ingest.post>[1]>
   }
 }
 
-async function handleUrlIngest(c: Parameters<Parameters<typeof ingest.post>[1]>[0]) {
+async function handleUrlIngest(c: Context) {
   const body = await c.req.json();
   const parsed = ingestUrlSchema.safeParse(body);
 
