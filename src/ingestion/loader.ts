@@ -1,24 +1,30 @@
 import { readFile } from "fs/promises";
 import { extname } from "path";
+import { isYoutubeUrl, loadYoutubeVideo } from "./loaders/youtube.js";
 
 export interface LoadedDocument {
   content: string;
   metadata: {
     title: string;
     source: string;
-    contentType: "pdf" | "markdown" | "html" | "code" | "text" | "url";
+    contentType: "pdf" | "markdown" | "html" | "code" | "text" | "url" | "youtube";
     size: number;
     pageCount?: number;
   };
 }
 
+export interface LoadOptions {
+  visionPrompt?: string;
+}
+
 /**
  * Load a document from a file path or URL and extract its text content.
  */
-export async function loadDocument(source: string): Promise<LoadedDocument> {
+export async function loadDocument(source: string, options?: LoadOptions): Promise<LoadedDocument> {
   const isUrl = source.startsWith("http://") || source.startsWith("https://");
 
   if (isUrl) {
+    if (isYoutubeUrl(source)) return loadYoutubeVideo(source, options);
     return loadUrl(source);
   }
 

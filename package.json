@@ -12,6 +12,7 @@
     "migrate:push": "drizzle-kit push",
     "seed": "tsx src/db/seed.ts",
     "ingest": "tsx src/ingestion/cli.ts",
+    "ingest:youtube": "tsx scripts/ingest-youtube.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "test": "vitest run",
@@ -34,6 +35,7 @@
     "openai": "^4.0.0",
     "pdfjs-dist": "^4.0.0",
     "pg": "^8.11.0",
+    "youtube-transcript": "^1.2.1",
     "zod": "^3.22.0"
   },
   "devDependencies": {
