@@ -53,9 +53,9 @@ export interface RagConfig {
 
 // Default config — overridden by initial-setup.md answers
 const defaultConfig: RagConfig = {
-  agentName: "RAG Agent",
-  agentDescription: "A production-ready RAG agent",
-  responseLanguage: "en",
+  agentName: "Emilio",
+  agentDescription: "Un asistente personal inteligente que recuerda todo lo que le compartes — vídeos, notas, ideas, enlaces — y te ayuda a recuperar esa información cuando la necesitas.",
+  responseLanguage: "es",
   useCase: "custom",
 
   topK: Number(process.env["RAG_TOP_K"] ?? 5),

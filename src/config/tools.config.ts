@@ -21,6 +21,10 @@ export const toolsConfig = {
              process.env["ENABLE_SEARCH_WEB"] !== "false",
     description: "Web search fallback via Perplexity sonar (requires PERPLEXITY_API_KEY)",
   },
+  saveNote: {
+    enabled: true,
+    description: "Ingest a YouTube URL into the knowledge base on demand",
+  },
 } satisfies Record<string, { enabled: boolean; description: string }>;
 
 export type ToolKey = keyof typeof toolsConfig;
