@@ -15,6 +15,7 @@ export interface LoadedDocument {
 
 export interface LoadOptions {
   visionPrompt?: string;
+  topicId?: string;
 }
 
 /**

@@ -22,7 +22,8 @@ export interface ProcessResult {
  */
 export async function processDocument(
   loaded: LoadedDocument,
-  orgId?: string
+  orgId?: string,
+  topicId?: string
 ): Promise<ProcessResult> {
   const source = loaded.metadata.source;
 
@@ -42,6 +43,7 @@ export async function processDocument(
     .insert(documents)
     .values({
       orgId,
+      topicId: topicId ?? null,
       title: loaded.metadata.title,
       source,
       contentType: loaded.metadata.contentType,

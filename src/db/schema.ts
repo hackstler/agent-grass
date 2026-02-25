@@ -6,6 +6,7 @@ import {
   jsonb,
   integer,
   index,
+  uniqueIndex,
   pgEnum,
   vector,
 } from "drizzle-orm/pg-core";
@@ -80,25 +81,47 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const documents = pgTable("documents", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  orgId: text("org_id"),
-  title: text("title").notNull(),
-  source: text("source").notNull(), // file path, URL, etc.
-  contentType: contentTypeEnum("content_type").notNull(),
-  status: documentStatusEnum("status").notNull().default("pending"),
-  chunkCount: integer("chunk_count").default(0),
-  metadata: jsonb("metadata").$type<{
-    size?: number;
-    pageCount?: number;
-    author?: string;
-    language?: string;
-    tags?: string[];
-    [key: string]: unknown;
-  }>(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  indexedAt: timestamp("indexed_at", { withTimezone: true }),
-});
+export const topics = pgTable(
+  "topics",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: text("org_id").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    orgIdIdx: index("topics_org_id_idx").on(table.orgId),
+    orgNameIdx: uniqueIndex("topics_org_id_name_idx").on(table.orgId, table.name),
+  })
+);
+
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: text("org_id"),
+    topicId: uuid("topic_id").references(() => topics.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    source: text("source").notNull(), // file path, URL, etc.
+    contentType: contentTypeEnum("content_type").notNull(),
+    status: documentStatusEnum("status").notNull().default("pending"),
+    chunkCount: integer("chunk_count").default(0),
+    metadata: jsonb("metadata").$type<{
+      size?: number;
+      pageCount?: number;
+      author?: string;
+      language?: string;
+      tags?: string[];
+      [key: string]: unknown;
+    }>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    indexedAt: timestamp("indexed_at", { withTimezone: true }),
+  },
+  (table) => ({
+    topicIdx: index("documents_topic_id_idx").on(table.orgId, table.topicId),
+  })
+);
 
 // Embedding dimension: 768 for Gemini gemini-embedding-001 (default)
 // 1536 for OpenAI text-embedding-3-small — set EMBEDDING_DIM env var to override
@@ -154,8 +177,13 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
-export const documentsRelations = relations(documents, ({ many }) => ({
+export const topicsRelations = relations(topics, ({ many }) => ({
+  documents: many(documents),
+}));
+
+export const documentsRelations = relations(documents, ({ one, many }) => ({
   chunks: many(documentChunks),
+  topic: one(topics, { fields: [documents.topicId], references: [topics.id] }),
 }));
 
 export const documentChunksRelations = relations(documentChunks, ({ one }) => ({
@@ -175,6 +203,8 @@ export type Conversation = typeof conversations.$inferSelect;
 export type NewConversation = typeof conversations.$inferInsert;
 export type Message = typeof messages.$inferSelect;
 export type NewMessage = typeof messages.$inferInsert;
+export type Topic = typeof topics.$inferSelect;
+export type NewTopic = typeof topics.$inferInsert;
 export type Document = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
 export type DocumentChunk = typeof documentChunks.$inferSelect;

@@ -11,6 +11,7 @@ import authRouter from "./api/auth.js";
 import ingest from "./api/ingest.js";
 import chat from "./api/chat.js";
 import conversationsRouter from "./api/conversations.js";
+import topicsRouter from "./api/topics.js";
 
 const app = new Hono();
 
@@ -34,10 +35,12 @@ const auth = authMiddleware();
 app.use("/ingest/*", auth);
 app.use("/chat/*", auth);
 app.use("/conversations/*", auth);
+app.use("/topics/*", auth);
 
 app.route("/ingest", ingest);
 app.route("/chat", chat);
 app.route("/conversations", conversationsRouter);
+app.route("/topics", topicsRouter);
 
 // 404 handler
 app.notFound((c) => c.json({ error: "Not found" }, 404));

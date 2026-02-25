@@ -17,6 +17,7 @@ const ingestUrlSchema = z.object({
   url: z.string().url(),
   orgId: z.string().optional(),
   title: z.string().optional(),
+  topicId: z.string().uuid().optional(),
 });
 
 /**
@@ -91,14 +92,14 @@ async function handleUrlIngest(c: Context) {
     return c.json({ error: parsed.error.message }, 400);
   }
 
-  const { url, orgId, title } = parsed.data;
+  const { url, orgId, title, topicId } = parsed.data;
   const loaded = await loadDocument(url);
 
   if (title) {
     loaded.metadata.title = title;
   }
 
-  const result = await processDocument(loaded, orgId);
+  const result = await processDocument(loaded, orgId, topicId);
 
   return c.json({
     documentId: result.documentId,

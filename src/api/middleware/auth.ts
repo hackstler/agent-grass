@@ -1,5 +1,7 @@
 import type { MiddlewareHandler, Context } from "hono";
-import { sign, verify, type JwtPayload } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
+const { sign, verify } = jwt;
+import type { JwtPayload } from "jsonwebtoken";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
