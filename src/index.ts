@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { ensurePgVector } from "./db/client.js";
+import { runMigrations } from "./db/migrate.js";
 import { authMiddleware } from "./api/middleware/auth.js";
 import health from "./api/health.js";
 import authRouter from "./api/auth.js";
@@ -66,9 +67,13 @@ async function main() {
     );
   }
 
-  // Ensure pgvector extension is installed
+  // Ensure pgvector extension is installed (needed before migrations)
   await ensurePgVector();
   console.log("[startup] pgvector extension ready");
+
+  // Apply pending SQL migrations automatically
+  await runMigrations();
+  console.log("[startup] migrations up to date");
 
   serve({ fetch: app.fetch, port: PORT }, () => {
     console.log(`[startup] rag-agent-backbone running on http://localhost:${PORT}`);
