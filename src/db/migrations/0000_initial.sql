@@ -4,10 +4,21 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Enums
-CREATE TYPE conversation_role AS ENUM ('user', 'assistant', 'system');
-CREATE TYPE document_status AS ENUM ('pending', 'processing', 'indexed', 'failed');
-CREATE TYPE content_type AS ENUM ('pdf', 'markdown', 'html', 'code', 'text', 'url');
+-- Enums (idempotent: skip if already exists)
+DO $$ BEGIN
+  CREATE TYPE conversation_role AS ENUM ('user', 'assistant', 'system');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE document_status AS ENUM ('pending', 'processing', 'indexed', 'failed');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE content_type AS ENUM ('pdf', 'markdown', 'html', 'code', 'text', 'url');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Users
 CREATE TABLE IF NOT EXISTS users (
@@ -28,7 +39,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX conversations_user_id_idx ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS conversations_user_id_idx ON conversations(user_id);
 
 -- Messages
 CREATE TABLE IF NOT EXISTS messages (
@@ -40,8 +51,8 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX messages_conversation_id_idx ON messages(conversation_id);
-CREATE INDEX messages_created_at_idx ON messages(created_at);
+CREATE INDEX IF NOT EXISTS messages_conversation_id_idx ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS messages_created_at_idx ON messages(created_at);
 
 -- Documents
 CREATE TABLE IF NOT EXISTS documents (
@@ -57,27 +68,27 @@ CREATE TABLE IF NOT EXISTS documents (
   indexed_at TIMESTAMPTZ
 );
 
-CREATE INDEX documents_org_id_idx ON documents(org_id);
-CREATE INDEX documents_status_idx ON documents(status);
+CREATE INDEX IF NOT EXISTS documents_org_id_idx ON documents(org_id);
+CREATE INDEX IF NOT EXISTS documents_status_idx ON documents(status);
 
 -- Document Chunks (with vector embedding)
 CREATE TABLE IF NOT EXISTS document_chunks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
-  -- 1536 dims for OpenAI text-embedding-3-small
-  -- Change to 768 for Ollama nomic-embed-text
-  embedding vector(1536),
+  -- 768 dims for Gemini gemini-embedding-001 (default)
+  -- Change to 1536 for OpenAI text-embedding-3-small
+  embedding vector(768),
   chunk_metadata JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX document_chunks_document_id_idx ON document_chunks(document_id);
+CREATE INDEX IF NOT EXISTS document_chunks_document_id_idx ON document_chunks(document_id);
 
 -- IVFFlat index for approximate nearest neighbor cosine similarity search
 -- Tune lists parameter: ~sqrt(row_count) for optimal performance
 -- Run AFTER loading initial data: SET ivfflat.probes = 10 for better recall
-CREATE INDEX document_chunks_embedding_idx
+CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx
   ON document_chunks
   USING ivfflat (embedding vector_cosine_ops)
   WITH (lists = 100);
@@ -91,6 +102,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_conversations_updated_at ON conversations;
 CREATE TRIGGER update_conversations_updated_at
   BEFORE UPDATE ON conversations
   FOR EACH ROW

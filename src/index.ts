@@ -4,8 +4,10 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
-import { ensurePgVector } from "./db/client.js";
-import { runMigrations } from "./db/migrate.js";
+import { ensurePgVector, db } from "./db/client.js";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { authMiddleware } from "./api/middleware/auth.js";
 import health from "./api/health.js";
 import authRouter from "./api/auth.js";
@@ -71,8 +73,9 @@ async function main() {
   await ensurePgVector();
   console.log("[startup] pgvector extension ready");
 
-  // Apply pending SQL migrations automatically
-  await runMigrations();
+  // Apply pending migrations using Drizzle's built-in migrator
+  const migrationsFolder = join(dirname(fileURLToPath(import.meta.url)), "db", "migrations");
+  await migrate(db, { migrationsFolder });
   console.log("[startup] migrations up to date");
 
   serve({ fetch: app.fetch, port: PORT }, () => {
