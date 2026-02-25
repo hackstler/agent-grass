@@ -8,6 +8,8 @@ import { ensurePgVector, db } from "./db/client.js";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { createHash } from "crypto";
+import { users } from "./db/schema.js";
 import { authMiddleware } from "./api/middleware/auth.js";
 import health from "./api/health.js";
 import authRouter from "./api/auth.js";
@@ -78,10 +80,32 @@ async function main() {
   await migrate(db, { migrationsFolder });
   console.log("[startup] migrations up to date");
 
+  // Auto-create admin user on first boot if credentials are configured
+  await seedAdminUser();
+
   serve({ fetch: app.fetch, port: PORT }, () => {
     console.log(`[startup] rag-agent-backbone running on http://localhost:${PORT}`);
     console.log(`[startup] Environment: ${process.env["NODE_ENV"] ?? "development"}`);
   });
+}
+
+async function seedAdminUser() {
+  const username = process.env["ADMIN_USERNAME"];
+  const password = process.env["ADMIN_PASSWORD"];
+  const jwtSecret = process.env["JWT_SECRET"];
+
+  if (!username || !password || !jwtSecret) return;
+
+  const [existing] = await db.select({ id: users.id }).from(users).limit(1);
+  if (existing) return; // ya hay usuarios, no tocar
+
+  const passwordHash = createHash("sha256").update(`${jwtSecret}:${password}`).digest("hex");
+  await db.insert(users).values({
+    email: username,
+    orgId: username,
+    metadata: { passwordHash, role: "admin" },
+  });
+  console.log(`[startup] Admin user '${username}' created`);
 }
 
 main().catch((err) => {
