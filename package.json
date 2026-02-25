@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js --external:pg-native",
+    "build": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:pg-native",
     "prestart": "drizzle-kit push --force",
     "start": "node dist/index.js",
     "migrate": "drizzle-kit migrate",
@@ -17,8 +17,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "prestart": "drizzle-kit push --force"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.30",

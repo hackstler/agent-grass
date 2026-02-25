@@ -5,9 +5,6 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { ensurePgVector, db } from "./db/client.js";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
 import { createHash } from "crypto";
 import { users } from "./db/schema.js";
 import { authMiddleware } from "./api/middleware/auth.js";
@@ -71,14 +68,9 @@ async function main() {
     );
   }
 
-  // Ensure pgvector extension is installed (needed before migrations)
+  // Ensure pgvector extension is installed (schema is applied by prestart: drizzle-kit push)
   await ensurePgVector();
   console.log("[startup] pgvector extension ready");
-
-  // Apply pending migrations using Drizzle's built-in migrator
-  const migrationsFolder = join(dirname(fileURLToPath(import.meta.url)), "db", "migrations");
-  await migrate(db, { migrationsFolder });
-  console.log("[startup] migrations up to date");
 
   // Auto-create admin user on first boot if credentials are configured
   await seedAdminUser();
