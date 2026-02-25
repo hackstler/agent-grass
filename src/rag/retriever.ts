@@ -14,7 +14,7 @@ export async function retrieve(
   queryEmbedding: number[],
   options: RetrieverOptions
 ): Promise<RetrievedChunk[]> {
-  const { topK, similarityThreshold, orgId, documentIds } = options;
+  const { topK, similarityThreshold, orgId, documentIds, topicId } = options;
 
   // Build pgvector cosine similarity query
   // 1 - cosine_distance = cosine_similarity
@@ -36,6 +36,7 @@ export async function retrieve(
       AND d.status = 'indexed'
       ${orgId ? sql`AND d.org_id = ${orgId}` : sql``}
       ${documentIds?.length ? sql`AND dc.document_id = ANY(${documentIds}::uuid[])` : sql``}
+      ${topicId ? sql`AND d.topic_id = ${topicId}::uuid` : sql``}
       AND 1 - (dc.embedding <=> ${embeddingStr}::vector) >= ${similarityThreshold}
     ORDER BY dc.embedding <=> ${embeddingStr}::vector
     LIMIT ${topK}

@@ -21,6 +21,7 @@ export async function runRetrievalPipeline(
     similarityThreshold: ragConfig.similarityThreshold,
     ...(options.orgId ? { orgId: options.orgId } : {}),
     ...(options.documentIds?.length ? { documentIds: options.documentIds } : {}),
+    ...(options.topicId ? { topicId: options.topicId } : {}),
   };
 
   let chunks = await retriever.retrieve(embedding, retrieverOptions);

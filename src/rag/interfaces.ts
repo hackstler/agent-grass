@@ -19,6 +19,7 @@ export interface RetrieverOptions {
   similarityThreshold: number;
   orgId?: string;
   documentIds?: string[];
+  topicId?: string;
 }
 
 export interface RerankerOptions {
@@ -47,6 +48,7 @@ export interface RetrievalPipelineOptions {
   topK?: number;
   orgId?: string;
   documentIds?: string[];
+  topicId?: string;
 }
 
 export interface RetrievalPipelineResult {
