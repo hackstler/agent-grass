@@ -35,6 +35,7 @@ export const contentTypeEnum = pgEnum("content_type", [
   "code",
   "text",
   "url",
+  "youtube",
 ]);
 
 // ============================================================

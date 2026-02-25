@@ -1,6 +1,7 @@
 import { toolsConfig } from "../../config/tools.config.js";
 import { searchDocumentsEntry } from "./search-documents.js";
 import { searchWebEntry } from "./search-web.js";
+import { saveNoteEntry } from "./save-note.js";
 import type { ToolEntry, ToolRegistryDeps } from "./base.js";
 
 export type { ToolRegistryDeps };
@@ -14,6 +15,7 @@ export type { ToolRegistryDeps };
 const ALL_TOOLS: ToolEntry[] = [
   searchDocumentsEntry,
   searchWebEntry,
+  saveNoteEntry,
 ];
 
 /**

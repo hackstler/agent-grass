@@ -5,7 +5,9 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { ensurePgVector } from "./db/client.js";
+import { authMiddleware } from "./api/middleware/auth.js";
 import health from "./api/health.js";
+import authRouter from "./api/auth.js";
 import ingest from "./api/ingest.js";
 import chat from "./api/chat.js";
 import conversationsRouter from "./api/conversations.js";
@@ -25,7 +27,14 @@ app.use(
 );
 
 // Routes
-app.route("/health", health);
+app.route("/health", health);                          // public — no auth
+app.route("/auth", authRouter);                        // public — register/login/me
+
+const auth = authMiddleware();
+app.use("/ingest/*", auth);
+app.use("/chat/*", auth);
+app.use("/conversations/*", auth);
+
 app.route("/ingest", ingest);
 app.route("/chat", chat);
 app.route("/conversations", conversationsRouter);

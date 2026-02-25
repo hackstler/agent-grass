@@ -51,20 +51,20 @@ export interface RagConfig {
   tracingProvider: "none" | "langfuse" | "langsmith";
 }
 
-// Default config — overridden by initial-setup.md answers
+// Default config — overridden by /setup wizard answers or env vars
 const defaultConfig: RagConfig = {
-  agentName: "RAG Agent",
-  agentDescription: "A production-ready RAG agent",
-  responseLanguage: "en",
+  agentName: process.env["AGENT_NAME"] ?? "RAG Agent",
+  agentDescription: process.env["AGENT_DESCRIPTION"] ?? "A production-ready RAG agent that answers questions based on your documents.",
+  responseLanguage: process.env["AGENT_LANGUAGE"] ?? "en",
   useCase: "custom",
 
   topK: Number(process.env["RAG_TOP_K"] ?? 5),
-  similarityThreshold: Number(process.env["RAG_SIMILARITY_THRESHOLD"] ?? 0.7),
+  similarityThreshold: Number(process.env["RAG_SIMILARITY_THRESHOLD"] ?? 0.5),
   chunkSize: Number(process.env["RAG_CHUNK_SIZE"] ?? 512),
   chunkOverlap: Number(process.env["RAG_CHUNK_OVERLAP"] ?? 50),
   chunkingStrategy: "fixed",
 
-  queryEnhancement: "none",
+  queryEnhancement: (process.env["RAG_QUERY_ENHANCEMENT"] as QueryEnhancement) || "multi-query",
   multiQueryCount: 3,
 
   enableReranking: false,
