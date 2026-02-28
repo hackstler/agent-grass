@@ -7,4 +7,7 @@ CREATE TABLE IF NOT EXISTS "whatsapp_sessions" (
   "updated_at" timestamptz DEFAULT now() NOT NULL
 );
 
-ALTER TABLE "whatsapp_sessions" ADD CONSTRAINT "whatsapp_sessions_org_id_unique" UNIQUE("org_id");
+DO $$ BEGIN
+  ALTER TABLE "whatsapp_sessions" ADD CONSTRAINT "whatsapp_sessions_org_id_unique" UNIQUE("org_id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
