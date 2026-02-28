@@ -14,6 +14,7 @@ import ingest from "./api/ingest.js";
 import chat from "./api/chat.js";
 import conversationsRouter from "./api/conversations.js";
 import topicsRouter from "./api/topics.js";
+import documentsRouter from "./api/documents.js";
 import channelsRouter from "./api/channels.js";
 import internalRouter from "./api/internal.js";
 
@@ -42,11 +43,13 @@ app.use("/ingest/*", auth);
 app.use("/chat/*", auth);
 app.use("/conversations/*", auth);
 app.use("/topics/*", auth);
+app.use("/documents/*", auth);
 
 app.route("/ingest", ingest);
 app.route("/chat", chat);
 app.route("/conversations", conversationsRouter);
 app.route("/topics", topicsRouter);
+app.route("/documents", documentsRouter);
 
 // WhatsApp channels — user-facing (uses same auth as other user routes)
 app.use("/channels/*", auth);
