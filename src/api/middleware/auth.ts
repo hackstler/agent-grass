@@ -86,6 +86,29 @@ export function authMiddleware(): MiddlewareHandler {
   };
 }
 
+// ── Optional auth ─────────────────────────────────────────────────────────────
+
+/**
+ * Parses JWT if present but does NOT reject unauthenticated requests.
+ * Sets c.var.user when a valid token is provided, leaves it undefined otherwise.
+ * Use for routes that behave differently depending on auth (e.g. /auth/register).
+ */
+export function optionalAuth(): MiddlewareHandler {
+  return async (c, next) => {
+    const jwtSecret = process.env["JWT_SECRET"];
+    const authHeader = c.req.header("Authorization");
+    if (jwtSecret && authHeader?.startsWith("Bearer ")) {
+      try {
+        const payload = verifyToken(authHeader.slice(7));
+        if ((payload as Record<string, unknown>)["role"] !== "worker") {
+          c.set("user", payload);
+        }
+      } catch { /* invalid token — treat as unauthenticated */ }
+    }
+    await next();
+  };
+}
+
 // ── requireRole guard ──────────────────────────────────────────────────────────
 
 /**

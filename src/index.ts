@@ -7,7 +7,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { ensurePgVector, runMigrations, db } from "./db/client.js";
 import { createHash } from "crypto";
 import { users } from "./db/schema.js";
-import { authMiddleware, requireWorker } from "./api/middleware/auth.js";
+import { authMiddleware, optionalAuth, requireWorker } from "./api/middleware/auth.js";
 import health from "./api/health.js";
 import authRouter from "./api/auth.js";
 import ingest from "./api/ingest.js";
@@ -36,7 +36,8 @@ app.route("/health", health);                          // public — no auth
 
 const auth = authMiddleware();
 app.use("/auth/me", auth);                             // /auth/me needs JWT
-app.route("/auth", authRouter);                        // register/login are public
+app.use("/auth/register", optionalAuth());             // register parses JWT if present (admin check)
+app.route("/auth", authRouter);                        // login is public
 app.use("/ingest/*", auth);
 app.use("/chat/*", auth);
 app.use("/conversations/*", auth);
