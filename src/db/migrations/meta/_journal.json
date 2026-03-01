@@ -8,6 +8,20 @@
       "when": 1772300000000,
       "tag": "0000_initial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772350000000,
+      "tag": "0001_enriched_chunks",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772381000000,
+      "tag": "0002_whatsapp_per_user",
+      "breakpoints": true
     }
   ]
 }
