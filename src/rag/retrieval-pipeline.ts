@@ -24,7 +24,10 @@ export async function runRetrievalPipeline(
     ...(options.topicId ? { topicId: options.topicId } : {}),
   };
 
-  let chunks = await retriever.retrieve(embedding, retrieverOptions);
+  // Step 2b: use hybrid search (vector + BM25) when queryText is available
+  let chunks = options.queryText
+    ? await retriever.retrieveHybrid(embedding, options.queryText, retrieverOptions)
+    : await retriever.retrieve(embedding, retrieverOptions);
   let expanded = false;
 
   // Step 3: query expansion when configured and initial recall is low

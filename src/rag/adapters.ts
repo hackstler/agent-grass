@@ -1,5 +1,5 @@
 import { createEmbedding } from "./embeddings.js";
-import { retrieve, retrieveMultiQuery } from "./retriever.js";
+import { retrieve, retrieveMultiQuery, retrieveHybrid } from "./retriever.js";
 import { rerank } from "./reranker.js";
 import type { IEmbedder, IRetriever, IReranker } from "./interfaces.js";
 
@@ -18,6 +18,7 @@ export const defaultEmbedder: IEmbedder = {
 export const pgvectorRetriever: IRetriever = {
   retrieve,
   retrieveMultiQuery,
+  retrieveHybrid,
 };
 
 export const defaultReranker: IReranker = {

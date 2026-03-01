@@ -38,6 +38,7 @@ export interface IEmbedder {
 export interface IRetriever {
   retrieve(queryEmbedding: number[], options: RetrieverOptions): Promise<RetrievedChunk[]>;
   retrieveMultiQuery(queryEmbeddings: number[][], options: RetrieverOptions): Promise<RetrievedChunk[]>;
+  retrieveHybrid(queryEmbedding: number[], queryText: string, options: RetrieverOptions): Promise<RetrievedChunk[]>;
 }
 
 export interface IReranker {
@@ -49,6 +50,7 @@ export interface RetrievalPipelineOptions {
   orgId?: string;
   documentIds?: string[];
   topicId?: string;
+  queryText?: string;
 }
 
 export interface RetrievalPipelineResult {

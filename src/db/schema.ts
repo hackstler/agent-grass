@@ -9,7 +9,14 @@ import {
   uniqueIndex,
   pgEnum,
   vector,
+  customType,
 } from "drizzle-orm/pg-core";
+
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
 import { relations } from "drizzle-orm";
 
 // ============================================================
@@ -113,6 +120,10 @@ export const documents = pgTable(
       author?: string;
       language?: string;
       tags?: string[];
+      summary?: string;
+      keywords?: string[];
+      entities?: string[];
+      detectedLanguage?: string;
       [key: string]: unknown;
     }>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -145,7 +156,9 @@ export const documentChunks = pgTable(
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
+    contextPrefix: text("context_prefix"),
     embedding: vector("embedding", { dimensions: EMBEDDING_DIM }),
+    searchVector: tsvector("search_vector"),
     chunkMetadata: jsonb("chunk_metadata").$type<{
       chunkIndex: number;
       startChar?: number;
@@ -164,6 +177,7 @@ export const documentChunks = pgTable(
       table.embedding.op("vector_cosine_ops")
     ),
     documentIdIdx: index("document_chunks_document_id_idx").on(table.documentId),
+    searchIdx: index("document_chunks_search_idx").using("gin", table.searchVector),
   })
 );
 

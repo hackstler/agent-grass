@@ -32,19 +32,22 @@ Returns the most relevant text passages ranked by relevance score.`,
       topK: z.number().optional().describe("Max results to return, defaults to config value"),
       orgId: z.string().optional(),
       documentIds: z.array(z.string()).optional(),
+      topicId: z.string().optional().describe("Filter by topic ID to narrow results"),
     }),
     outputSchema: z.object({
       chunks: z.array(chunkSchema),
       chunkCount: z.number(),
     }),
-    execute: async ({ query, topK = ragConfig.topK, orgId, documentIds }) => {
+    execute: async ({ query, topK = ragConfig.topK, orgId, documentIds, topicId }) => {
       const { chunks, chunkCount } = await runRetrievalPipeline(
         query,
         { embedder, retriever, reranker },
         {
           topK,
+          queryText: query,
           ...(orgId ? { orgId } : {}),
           ...(documentIds?.length ? { documentIds } : {}),
+          ...(topicId ? { topicId } : {}),
         }
       );
       return {
