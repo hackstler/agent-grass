@@ -16,10 +16,19 @@ services:
       NODE_ENV: production
       # Configurados en Railway:
       # DATABASE_URL (Supabase con pgvector habilitado)
-      # ANTHROPIC_API_KEY
+      # GOOGLE_API_KEY
+      # GEMINI_MODEL
+      #
+      # Multi-tenant (requiere JWT_SECRET):
+      # JWT_SECRET (compartido con whatsapp-worker)
+      # ADMIN_USERNAME (auto-create admin on first boot)
+      # ADMIN_PASSWORD
+      #
+      # Opcional:
       # OPENAI_API_KEY
-      # LANGFUSE_SECRET_KEY (opcional)
-      # LANGFUSE_PUBLIC_KEY (opcional)
+      # PERPLEXITY_API_KEY
+      # LANGFUSE_SECRET_KEY
+      # LANGFUSE_PUBLIC_KEY
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s

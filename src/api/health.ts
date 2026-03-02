@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { checkDbConnection } from "../db/client.js";
+import { checkDbConnection } from "../infrastructure/db/client.js";
 
 const health = new Hono();
 

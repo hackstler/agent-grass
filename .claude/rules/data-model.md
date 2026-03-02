@@ -28,5 +28,8 @@
 - La query de similarity search en `retriever.ts` usa SQL raw por necesidad del operador `<=>` de pgvector — eso está permitido.
 
 ## Types
-- Exportar siempre los tipos inferidos: `export type User = typeof users.$inferSelect`.
-- Usar `NewXxx` para tipos de inserción: `export type NewUser = typeof users.$inferInsert`.
+- Los tipos Drizzle inferidos (`$inferSelect`, `$inferInsert`) viven en `src/infrastructure/db/schema.ts`.
+- Las interfaces de dominio equivalentes viven en `src/domain/entities/index.ts`.
+- **Domain y Application** importan de `src/domain/entities/` — nunca de `infrastructure/db/schema.ts`.
+- **Infrastructure** (repositories, ingestion, rag) puede importar de `infrastructure/db/schema.ts` directamente.
+- Los tipos son estructuralmente compatibles — no hace falta mapping explícito.

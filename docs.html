@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rag-agent-backbone — Arquitectura</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: #080c14;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 80px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: #f1f5f9;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .subtitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #475569;
+    letter-spacing: 0.12em;
+    margin-bottom: 36px;
+  }
+  svg {
+    width: 100%;
+    max-width: 1140px;
+    height: auto;
+    display: block;
+  }
+
+  /* ── Sections ── */
+  .sections {
+    width: 100%;
+    max-width: 1140px;
+    margin-top: 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+  }
+
+  .section {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid transparent;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 28px;
+  }
+
+  .section-bar {
+    width: 4px;
+    height: 36px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .section-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    opacity: 0.5;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    color: #f1f5f9;
+    margin-top: 2px;
+  }
+
+  .section-body {
+    padding: 0 28px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .intro {
+    font-size: 13px;
+    line-height: 1.8;
+    color: #94a3b8;
+    max-width: 860px;
+    border-left: 3px solid transparent;
+    padding-left: 16px;
+  }
+
+  /* Cards grid */
+  .cards {
+    display: grid;
+    gap: 16px;
+  }
+  .cards-2 { grid-template-columns: repeat(2, 1fr); }
+  .cards-3 { grid-template-columns: repeat(3, 1fr); }
+  .cards-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 900px) {
+    .cards-3, .cards-4 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .cards-2, .cards-3, .cards-4 { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    border-radius: 6px;
+    padding: 20px;
+    border: 1px solid transparent;
+  }
+
+  .card-file {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    opacity: 0.55;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 10px;
+  }
+
+  .card p {
+    font-size: 12px;
+    line-height: 1.75;
+    color: #64748b;
+  }
+
+  .card p + p { margin-top: 8px; }
+
+  /* Flow steps */
+  .flow {
+    display: flex;
+    gap: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .flow-step {
+    flex: 1;
+    min-width: 160px;
+    padding: 18px 16px;
+    border-radius: 0;
+    position: relative;
+    border-top: 1px solid transparent;
+    border-bottom: 1px solid transparent;
+  }
+  .flow-step:first-child { border-radius: 6px 0 0 6px; border-left: 1px solid transparent; }
+  .flow-step:last-child  { border-radius: 0 6px 6px 0; border-right: 1px solid transparent; }
+
+  .flow-step::after {
+    content: '→';
+    position: absolute;
+    right: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+    color: #1e2d45;
+    z-index: 1;
+  }
+  .flow-step:last-child::after { display: none; }
+
+  .step-num {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    opacity: 0.45;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .step-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 6px;
+  }
+
+  .step-desc {
+    font-size: 11px;
+    line-height: 1.65;
+    color: #475569;
+  }
+
+  /* KV list */
+  .kv {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .kv-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .kv-key {
+    font-weight: 600;
+    flex-shrink: 0;
+    width: 200px;
+    color: #94a3b8;
+  }
+
+  .kv-val { color: #475569; }
+
+  /* Callout */
+  .callout {
+    border-radius: 6px;
+    padding: 16px 20px;
+    font-size: 12px;
+    line-height: 1.75;
+    color: #64748b;
+    border-left: 3px solid transparent;
+  }
+
+  .callout strong { color: #94a3b8; }
+
+  /* Tag chips */
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .tag {
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Color themes per layer ── */
+  /* Layer 0 — slate */
+  .l0 { background: #0d1520; border-color: #1e2d45; }
+  .l0 .section-bar { background: #475569; }
+  .l0 .section-label { color: #475569; }
+  .l0 .intro { border-color: #1e2d45; }
+  .l0 .card { background: #111827; border-color: #1e2d45; }
+  .l0 .card-file { color: #475569; }
+  .l0 .flow-step { background: #111827; border-color: #1e2d45; }
+  .l0 .step-num { color: #475569; }
+  .l0 .callout { background: #0a1018; border-color: #1e2d45; }
+  .l0 .tag { background: #1e2d45; color: #475569; }
+
+  /* Layer 1 — blue */
+  .l1 { background: #0d1a2e; border-color: #1e3a5f; }
+  .l1 .section-bar { background: #3b82f6; }
+  .l1 .section-label { color: #3b82f6; }
+  .l1 .intro { border-color: #1e3a5f; }
+  .l1 .card { background: #0f2040; border-color: #1e3a5f; }
+  .l1 .card-file { color: #3b82f6; }
+  .l1 .flow-step { background: #0f2040; border-color: #1e3a5f; }
+  .l1 .step-num { color: #3b82f6; }
+  .l1 .callout { background: #091428; border-color: #1e3a5f; }
+  .l1 .tag { background: #1e3a5f; color: #60a5fa; }
+
+  /* Layer 2 — violet */
+  .l2 { background: #13082e; border-color: #3730a3; }
+  .l2 .section-bar { background: #7c3aed; }
+  .l2 .section-label { color: #7c3aed; }
+  .l2 .intro { border-color: #3730a3; }
+  .l2 .card { background: #1a0f40; border-color: #3730a3; }
+  .l2 .card-file { color: #7c3aed; }
+  .l2 .flow-step { background: #1a0f40; border-color: #3730a3; }
+  .l2 .step-num { color: #7c3aed; }
+  .l2 .callout { background: #0e0720; border-color: #3730a3; }
+  .l2 .tag { background: #2e1f6e; color: #a78bfa; }
+
+  /* Layer 3a — cyan (RAG pipeline) */
+  .l3a { background: #03151e; border-color: #0e7490; }
+  .l3a .section-bar { background: #06b6d4; }
+  .l3a .section-label { color: #06b6d4; }
+  .l3a .intro { border-color: #0e7490; }
+  .l3a .card { background: #042a36; border-color: #0e7490; }
+  .l3a .card-file { color: #06b6d4; }
+  .l3a .flow-step { background: #042a36; border-color: #0e7490; }
+  .l3a .step-num { color: #06b6d4; }
+  .l3a .callout { background: #020e15; border-color: #0e7490; }
+  .l3a .tag { background: #0e4a5c; color: #22d3ee; }
+
+  /* Layer 3b — emerald (ingestion) */
+  .l3b { background: #021f12; border-color: #065f46; }
+  .l3b .section-bar { background: #10b981; }
+  .l3b .section-label { color: #10b981; }
+  .l3b .intro { border-color: #065f46; }
+  .l3b .card { background: #031f12; border-color: #065f46; }
+  .l3b .card-file { color: #10b981; }
+  .l3b .flow-step { background: #031f12; border-color: #065f46; }
+  .l3b .step-num { color: #10b981; }
+  .l3b .callout { background: #011208; border-color: #065f46; }
+  .l3b .tag { background: #064030; color: #34d399; }
+
+  /* Layer 4 — amber (DB) */
+  .l4 { background: #1a0e00; border-color: #92400e; }
+  .l4 .section-bar { background: #f59e0b; }
+  .l4 .section-label { color: #f59e0b; }
+  .l4 .intro { border-color: #92400e; }
+  .l4 .card { background: #1f1200; border-color: #92400e; }
+  .l4 .card-file { color: #f59e0b; }
+  .l4 .flow-step { background: #1f1200; border-color: #92400e; }
+  .l4 .step-num { color: #f59e0b; }
+  .l4 .callout { background: #100800; border-color: #92400e; }
+  .l4 .tag { background: #451a00; color: #fbbf24; }
+
+  /* Layer 5 — rose (external APIs) */
+  .l5 { background: #1a0210; border-color: #9f1239; }
+  .l5 .section-bar { background: #f43f5e; }
+  .l5 .section-label { color: #f43f5e; }
+  .l5 .intro { border-color: #9f1239; }
+  .l5 .card { background: #1f0515; border-color: #9f1239; }
+  .l5 .card-file { color: #f43f5e; }
+  .l5 .flow-step { background: #1f0515; border-color: #9f1239; }
+  .l5 .step-num { color: #f43f5e; }
+  .l5 .callout { background: #100010; border-color: #9f1239; }
+  .l5 .tag { background: #4c0519; color: #fb7185; }
+</style>
+</head>
+<body>
+
+<h1>rag-agent-backbone</h1>
+<p class="subtitle">arquitectura completa · capas de sistema · flujo de datos</p>
+
+<svg viewBox="0 0 1140 940" xmlns="http://www.w3.org/2000/svg" font-family="'JetBrains Mono', monospace">
+<defs>
+  <marker id="arr-white" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#334155"/>
+  </marker>
+  <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6"/>
+  </marker>
+  <marker id="arr-violet" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#7c3aed"/>
+  </marker>
+  <marker id="arr-cyan" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#06b6d4"/>
+  </marker>
+  <marker id="arr-emerald" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#10b981"/>
+  </marker>
+  <marker id="arr-amber" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/>
+  </marker>
+  <marker id="arr-rose" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#f43f5e"/>
+  </marker>
+  <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+    <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#0f1729" stroke-width="0.5"/>
+  </pattern>
+</defs>
+
+<rect width="1140" height="940" fill="url(#grid)"/>
+
+<!-- LAYER 0 — ENTRY & CONFIG -->
+<rect x="20" y="20" width="1100" height="100" rx="6" fill="#0d1520" stroke="#1e2d45" stroke-width="1"/>
+<rect x="20" y="20" width="4" height="100" rx="2" fill="#475569"/>
+<text x="38" y="38" font-size="8.5" fill="#475569" font-weight="500" letter-spacing="0.15em" text-anchor="start">CAPA 0  ·  ENTRADA &amp; CONFIGURACIÓN</text>
+<rect x="38" y="48" width="230" height="60" rx="4" fill="#111827" stroke="#1e2d45" stroke-width="1"/>
+<text x="53" y="66" font-size="9" fill="#94a3b8" font-weight="500">src/index.ts</text>
+<text x="53" y="81" font-size="8" fill="#475569">main() · ensurePgVector()</text>
+<text x="53" y="95" font-size="8" fill="#475569">logger · secureHeaders · cors · onError</text>
+<rect x="290" y="48" width="245" height="60" rx="4" fill="#111827" stroke="#1e2d45" stroke-width="1"/>
+<text x="305" y="66" font-size="9" fill="#94a3b8" font-weight="500">rag.config.ts</text>
+<text x="305" y="81" font-size="8" fill="#475569">topK · similarityThreshold · chunkSize</text>
+<text x="305" y="95" font-size="8" fill="#475569">llmModel · embeddingModel · windowSize · queryEnhancement</text>
+<rect x="557" y="48" width="200" height="60" rx="4" fill="#111827" stroke="#1e2d45" stroke-width="1"/>
+<text x="572" y="66" font-size="9" fill="#94a3b8" font-weight="500">tools.config.ts</text>
+<text x="572" y="81" font-size="8" fill="#475569">searchDocuments: enabled</text>
+<text x="572" y="95" font-size="8" fill="#475569">searchWeb: !! PERPLEXITY_API_KEY</text>
+<rect x="779" y="48" width="320" height="60" rx="4" fill="#111827" stroke="#1e2d45" stroke-width="1"/>
+<text x="794" y="66" font-size="9" fill="#94a3b8" font-weight="500">useCasePresets</text>
+<text x="794" y="81" font-size="8" fill="#475569">customer-support → multi-query + reranking</text>
+<text x="794" y="95" font-size="8" fill="#475569">knowledge-base → step-back · qa · default</text>
+
+<line x1="570" y1="120" x2="570" y2="138" stroke="#1e2d45" stroke-width="1.5" marker-end="url(#arr-white)"/>
+
+<!-- LAYER 1 — API -->
+<rect x="20" y="143" width="1100" height="90" rx="6" fill="#0d1a2e" stroke="#1e3a5f" stroke-width="1"/>
+<rect x="20" y="143" width="4" height="90" rx="2" fill="#3b82f6"/>
+<text x="38" y="161" font-size="8.5" fill="#3b82f6" font-weight="500" letter-spacing="0.15em">CAPA 1  ·  API  HTTP</text>
+<rect x="38" y="169" width="185" height="52" rx="4" fill="#0f2040" stroke="#1e3a5f" stroke-width="1"/>
+<text x="53" y="185" font-size="8.5" fill="#60a5fa" font-weight="600">POST /chat</text>
+<text x="53" y="199" font-size="7.5" fill="#334155">chat.ts · Zod validate</text>
+<text x="53" y="211" font-size="7.5" fill="#334155">resolveConversationId · persistMessages</text>
+<rect x="237" y="169" width="185" height="52" rx="4" fill="#0f2040" stroke="#1e3a5f" stroke-width="1"/>
+<text x="252" y="185" font-size="8.5" fill="#60a5fa" font-weight="600">GET /chat/stream</text>
+<text x="252" y="199" font-size="7.5" fill="#334155">SSE · fullStream</text>
+<text x="252" y="211" font-size="7.5" fill="#334155">text-delta · tool-result · done</text>
+<rect x="436" y="169" width="180" height="52" rx="4" fill="#0f2040" stroke="#1e3a5f" stroke-width="1"/>
+<text x="451" y="185" font-size="8.5" fill="#60a5fa" font-weight="600">POST /ingest</text>
+<text x="451" y="199" font-size="7.5" fill="#334155">ingest.ts</text>
+<text x="451" y="211" font-size="7.5" fill="#334155">source (file/URL) · orgId</text>
+<rect x="630" y="169" width="200" height="52" rx="4" fill="#0f2040" stroke="#1e3a5f" stroke-width="1"/>
+<text x="645" y="185" font-size="8.5" fill="#60a5fa" font-weight="600">GET · DELETE /conversations</text>
+<text x="645" y="199" font-size="7.5" fill="#334155">conversations.ts</text>
+<text x="645" y="211" font-size="7.5" fill="#334155">list · getById · cascade delete</text>
+<rect x="844" y="169" width="255" height="52" rx="4" fill="#0f2040" stroke="#1e3a5f" stroke-width="1"/>
+<text x="859" y="185" font-size="8.5" fill="#60a5fa" font-weight="600">GET /health</text>
+<text x="859" y="199" font-size="7.5" fill="#334155">health.ts · SELECT 1</text>
+<text x="859" y="211" font-size="7.5" fill="#334155">ok 200 / db error 503</text>
+
+<line x1="340" y1="233" x2="340" y2="252" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+<line x1="526" y1="233" x2="526" y2="252" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr-emerald)"/>
+
+<!-- LAYER 2 — AGENT -->
+<rect x="20" y="257" width="570" height="135" rx="6" fill="#13082e" stroke="#3730a3" stroke-width="1"/>
+<rect x="20" y="257" width="4" height="135" rx="2" fill="#7c3aed"/>
+<text x="38" y="275" font-size="8.5" fill="#7c3aed" font-weight="500" letter-spacing="0.15em">CAPA 2  ·  AGENTE  MASTRA</text>
+<rect x="38" y="283" width="270" height="97" rx="4" fill="#1a0f40" stroke="#3730a3" stroke-width="1"/>
+<text x="53" y="300" font-size="9" fill="#a78bfa" font-weight="600">rag-agent.ts</text>
+<text x="53" y="315" font-size="7.5" fill="#4c1d95">────────────────────────</text>
+<text x="53" y="329" font-size="7.5" fill="#6d28d9">Memory</text>
+<text x="53" y="341" font-size="7.5" fill="#475569">PostgresStore · schema:"mastra"</text>
+<text x="53" y="353" font-size="7.5" fill="#475569">lastMessages: windowSize×2 · semanticRecall:false</text>
+<text x="53" y="367" font-size="7.5" fill="#6d28d9">Agent</text>
+<text x="53" y="374" font-size="7" fill="#475569">instructions · model: gemini-2.5-flash · tools + memory</text>
+<rect x="326" y="283" width="125" height="97" rx="4" fill="#1a0f40" stroke="#3730a3" stroke-width="1"/>
+<text x="339" y="300" font-size="8.5" fill="#a78bfa" font-weight="600">searchDocuments</text>
+<text x="339" y="315" font-size="7.5" fill="#475569">tool principal</text>
+<text x="339" y="329" font-size="7.5" fill="#475569">query · topK</text>
+<text x="339" y="343" font-size="7.5" fill="#475569">orgId · docIds</text>
+<text x="339" y="357" font-size="7" fill="#3730a3">→ runRetrievalPipeline</text>
+<rect x="463" y="283" width="115" height="97" rx="4" fill="#1a0f40" stroke="#3730a3" stroke-width="1"/>
+<text x="476" y="300" font-size="8.5" fill="#a78bfa" font-weight="600">searchWeb</text>
+<text x="476" y="315" font-size="7.5" fill="#475569">fallback tool</text>
+<text x="476" y="329" font-size="7.5" fill="#475569">solo si 0 chunks</text>
+<text x="476" y="343" font-size="7.5" fill="#475569">Perplexity sonar</text>
+<text x="476" y="357" font-size="7" fill="#3730a3">PERPLEXITY_API_KEY</text>
+<text x="476" y="368" font-size="7" fill="#3730a3">req. para activar</text>
+<text x="340" y="277" font-size="7.5" fill="#4c1d95" letter-spacing="0.1em">createToolRegistry(deps)</text>
+
+<line x1="340" y1="392" x2="340" y2="412" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arr-violet)"/>
+
+<!-- LAYER 3a — RAG PIPELINE -->
+<rect x="20" y="417" width="570" height="195" rx="6" fill="#03151e" stroke="#0e7490" stroke-width="1"/>
+<rect x="20" y="417" width="4" height="195" rx="2" fill="#06b6d4"/>
+<text x="38" y="435" font-size="8.5" fill="#06b6d4" font-weight="500" letter-spacing="0.15em">CAPA 3a  ·  PIPELINE  RAG  —  retrieval-pipeline.ts</text>
+<rect x="38" y="443" width="118" height="78" rx="4" fill="#042a36" stroke="#0e7490" stroke-width="1"/>
+<text x="48" y="460" font-size="8.5" fill="#22d3ee" font-weight="600">① embed</text>
+<text x="48" y="474" font-size="7.5" fill="#475569">embeddings.ts</text>
+<text x="48" y="487" font-size="7.5" fill="#475569">createEmbedding()</text>
+<text x="48" y="500" font-size="7.5" fill="#475569">Gemini / OpenAI</text>
+<text x="48" y="513" font-size="7" fill="#0e7490">→ vector[768]</text>
+<rect x="170" y="443" width="118" height="78" rx="4" fill="#042a36" stroke="#0e7490" stroke-width="1"/>
+<text x="180" y="460" font-size="8.5" fill="#22d3ee" font-weight="600">② retrieve</text>
+<text x="180" y="474" font-size="7.5" fill="#475569">retriever.ts</text>
+<text x="180" y="487" font-size="7.5" fill="#475569">pgvector &lt;=&gt;</text>
+<text x="180" y="500" font-size="7.5" fill="#475569">cosine distance</text>
+<text x="180" y="513" font-size="7" fill="#0e7490">score ≥ threshold</text>
+<rect x="302" y="443" width="135" height="78" rx="4" fill="#042a36" stroke="#0e7490" stroke-width="1"/>
+<text x="312" y="460" font-size="8.5" fill="#22d3ee" font-weight="600">③ expand</text>
+<text x="312" y="474" font-size="7" fill="#f59e0b">si chunks &lt; 3</text>
+<text x="312" y="487" font-size="7.5" fill="#475569">query-transformer.ts</text>
+<text x="312" y="500" font-size="7" fill="#475569">multi-query / HyDE</text>
+<text x="312" y="511" font-size="7" fill="#475569">step-back · retrieveMultiQuery</text>
+<text x="312" y="522" font-size="7" fill="#0e7490">dedup por id · best score</text>
+<rect x="451" y="443" width="127" height="78" rx="4" fill="#042a36" stroke="#0e7490" stroke-width="1"/>
+<text x="461" y="460" font-size="8.5" fill="#22d3ee" font-weight="600">④ rerank</text>
+<text x="461" y="474" font-size="7.5" fill="#475569">reranker.ts</text>
+<text x="461" y="487" font-size="7.5" fill="#475569">Cohere / local</text>
+<text x="461" y="500" font-size="7.5" fill="#475569">cross-encoder</text>
+<text x="461" y="513" font-size="7" fill="#0e7490">→ top N chunks</text>
+<line x1="157" y1="482" x2="169" y2="482" stroke="#0e7490" stroke-width="1.2" marker-end="url(#arr-cyan)"/>
+<line x1="289" y1="482" x2="301" y2="482" stroke="#0e7490" stroke-width="1.2" marker-end="url(#arr-cyan)"/>
+<line x1="438" y1="482" x2="450" y2="482" stroke="#0e7490" stroke-width="1.2" marker-end="url(#arr-cyan)"/>
+<rect x="38" y="535" width="240" height="65" rx="4" fill="#032030" stroke="#0e7490" stroke-width="0.5" stroke-dasharray="3 2"/>
+<text x="53" y="552" font-size="8" fill="#0891b2" font-weight="600">chunker.ts</text>
+<text x="53" y="565" font-size="7.5" fill="#475569">chunkFixed · chunkSemantic · chunkHierarchical</text>
+<text x="53" y="578" font-size="7.5" fill="#475569">overlap para no cortar ideas a la mitad</text>
+<text x="53" y="591" font-size="7" fill="#0e7490">usado en ingesta · configurable en ragConfig</text>
+<rect x="292" y="535" width="286" height="65" rx="4" fill="#032030" stroke="#0e7490" stroke-width="0.5" stroke-dasharray="3 2"/>
+<text x="307" y="552" font-size="8" fill="#0891b2" font-weight="600">interfaces.ts  +  adapters.ts</text>
+<text x="307" y="565" font-size="7.5" fill="#475569">IEmbedder · IRetriever · IReranker</text>
+<text x="307" y="578" font-size="7.5" fill="#475569">defaultEmbedder · pgvectorRetriever · defaultReranker</text>
+<text x="307" y="591" font-size="7" fill="#0e7490">intercambiables sin tocar el resto del código</text>
+
+<!-- LAYER 3b — INGESTION -->
+<rect x="605" y="257" width="515" height="355" rx="6" fill="#021f12" stroke="#065f46" stroke-width="1"/>
+<rect x="605" y="257" width="4" height="355" rx="2" fill="#10b981"/>
+<text x="623" y="275" font-size="8.5" fill="#10b981" font-weight="500" letter-spacing="0.15em">CAPA 3b  ·  INGESTA</text>
+<rect x="623" y="283" width="485" height="115" rx="4" fill="#031f12" stroke="#065f46" stroke-width="1"/>
+<text x="638" y="300" font-size="9" fill="#34d399" font-weight="600">loader.ts  —  loadDocument(source)</text>
+<text x="638" y="315" font-size="7.5" fill="#475569">detecta si es URL o ruta de fichero · delega al loader correcto</text>
+<rect x="638" y="323" width="83" height="63" rx="3" fill="#042a1e" stroke="#065f46" stroke-width="0.8"/>
+<text x="648" y="339" font-size="8" fill="#6ee7b7">PDF</text>
+<text x="648" y="352" font-size="7" fill="#374151">pdfjs-dist</text>
+<text x="648" y="363" font-size="7" fill="#374151">página</text>
+<text x="648" y="374" font-size="7" fill="#374151">a página</text>
+<rect x="733" y="323" width="83" height="63" rx="3" fill="#042a1e" stroke="#065f46" stroke-width="0.8"/>
+<text x="743" y="339" font-size="8" fill="#6ee7b7">Markdown</text>
+<text x="743" y="352" font-size="7" fill="#374151">extrae title</text>
+<text x="743" y="363" font-size="7" fill="#374151">del primer</text>
+<text x="743" y="374" font-size="7" fill="#374151"># heading</text>
+<rect x="828" y="323" width="83" height="63" rx="3" fill="#042a1e" stroke="#065f46" stroke-width="0.8"/>
+<text x="838" y="339" font-size="8" fill="#6ee7b7">HTML/URL</text>
+<text x="838" y="352" font-size="7" fill="#374151">Cheerio</text>
+<text x="838" y="363" font-size="7" fill="#374151">elimina nav</text>
+<text x="838" y="374" font-size="7" fill="#374151">footer script</text>
+<rect x="923" y="323" width="83" height="63" rx="3" fill="#042a1e" stroke="#065f46" stroke-width="0.8"/>
+<text x="933" y="339" font-size="8" fill="#6ee7b7">Code</text>
+<text x="933" y="352" font-size="7" fill="#374151">cualquier ext.</text>
+<text x="933" y="363" font-size="7" fill="#374151">no reconocida</text>
+<text x="933" y="374" font-size="7" fill="#374151">+ filename</text>
+<rect x="623" y="410" width="485" height="190" rx="4" fill="#031f12" stroke="#065f46" stroke-width="1"/>
+<text x="638" y="427" font-size="9" fill="#34d399" font-weight="600">processor.ts  —  processDocument(loaded, orgId)</text>
+<rect x="638" y="436" width="95" height="55" rx="3" fill="#042a1e" stroke="#065f46" stroke-width="0.8"/>
+<text x="648" y="451" font-size="7.5" fill="#6ee7b7">① DB insert</text>
+<text x="648" y="463" font-size="7" fill="#374151">status:</text>
+<text x="648" y="474" font-size="7" fill="#374151">"processing"</text>
+<text x="648" y="485" font-size="7" fill="#065f46">fail-safe</text>
+<line x1="734" y1="463" x2="744" y2="463" stroke="#065f46" stroke-width="1.2" marker-end="url(#arr-emerald)"/>
+<rect x="745" y="436" width="95" height="55" rx="3" fill="#042a1e" stroke="#065f46" stroke-width="0.8"/>
+<text x="755" y="451" font-size="7.5" fill="#6ee7b7">② chunk()</text>
+<text x="755" y="463" font-size="7" fill="#374151">estrategia de</text>
+<text x="755" y="474" font-size="7" fill="#374151">ragConfig</text>
+<text x="755" y="485" font-size="7" fill="#065f46">~512 tokens</text>
+<line x1="841" y1="463" x2="851" y2="463" stroke="#065f46" stroke-width="1.2" marker-end="url(#arr-emerald)"/>
+<rect x="852" y="436" width="115" height="55" rx="3" fill="#042a1e" stroke="#065f46" stroke-width="0.8"/>
+<text x="862" y="451" font-size="7.5" fill="#6ee7b7">③ embed batches</text>
+<text x="862" y="463" font-size="7" fill="#374151">lotes de 20</text>
+<text x="862" y="474" font-size="7" fill="#374151">Promise.all()</text>
+<text x="862" y="485" font-size="7" fill="#065f46">evita rate limit</text>
+<line x1="968" y1="463" x2="978" y2="463" stroke="#065f46" stroke-width="1.2" marker-end="url(#arr-emerald)"/>
+<rect x="979" y="436" width="117" height="55" rx="3" fill="#042a1e" stroke="#065f46" stroke-width="0.8"/>
+<text x="989" y="451" font-size="7.5" fill="#6ee7b7">④ insert DB</text>
+<text x="989" y="463" font-size="7" fill="#374151">document_chunks</text>
+<text x="989" y="474" font-size="7" fill="#374151">con embedding</text>
+<text x="989" y="485" font-size="7" fill="#065f46">+ status:"indexed"</text>
+<rect x="638" y="502" width="458" height="35" rx="3" fill="#1c0a0a" stroke="#7f1d1d" stroke-width="0.8" stroke-dasharray="3 2"/>
+<text x="653" y="517" font-size="7.5" fill="#ef4444">catch → status: "failed" · error en metadata · no re-lanza</text>
+<text x="653" y="530" font-size="7" fill="#374151">resultado: { documentId, chunkCount, status: "indexed" | "failed" }</text>
+<rect x="638" y="547" width="458" height="40" rx="3" fill="#031f12" stroke="#065f46" stroke-width="0.5"/>
+<text x="653" y="562" font-size="7.5" fill="#059669">ciclo de status: pending → processing → indexed</text>
+<text x="653" y="578" font-size="7" fill="#374151">solo documentos con status="indexed" participan en búsquedas del retriever</text>
+
+<!-- ARROWS to DB layer -->
+<line x1="340" y1="612" x2="340" y2="635" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arr-cyan)"/>
+<line x1="860" y1="612" x2="860" y2="635" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr-emerald)"/>
+<line x1="190" y1="392" x2="190" y2="635" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arr-violet)"/>
+
+<!-- LAYER 4 — DATABASE -->
+<rect x="20" y="640" width="1100" height="120" rx="6" fill="#1a0e00" stroke="#92400e" stroke-width="1"/>
+<rect x="20" y="640" width="4" height="120" rx="2" fill="#f59e0b"/>
+<text x="38" y="658" font-size="8.5" fill="#f59e0b" font-weight="500" letter-spacing="0.15em">CAPA 4  ·  PERSISTENCIA  —  PostgreSQL + pgvector  (schema.ts + client.ts)</text>
+<rect x="38" y="666" width="165" height="82" rx="4" fill="#1f1200" stroke="#92400e" stroke-width="1"/>
+<text x="53" y="682" font-size="8.5" fill="#fbbf24" font-weight="600">documents</text>
+<text x="53" y="695" font-size="7" fill="#475569">id · orgId · source · title</text>
+<text x="53" y="707" font-size="7" fill="#475569">status: pending|processing</text>
+<text x="53" y="719" font-size="7" fill="#475569">         indexed|failed</text>
+<text x="53" y="731" font-size="7" fill="#475569">chunkCount · indexedAt</text>
+<text x="53" y="740" font-size="7" fill="#78350f">metadata (JSON)</text>
+<rect x="218" y="666" width="200" height="82" rx="4" fill="#1f1200" stroke="#92400e" stroke-width="1"/>
+<text x="233" y="682" font-size="8.5" fill="#fbbf24" font-weight="600">document_chunks ★</text>
+<text x="233" y="695" font-size="7" fill="#475569">content · embedding vector(768)</text>
+<text x="233" y="707" font-size="7" fill="#f59e0b">INDEX ivfflat (embedding)</text>
+<text x="233" y="719" font-size="7" fill="#475569">operator: &lt;=&gt; cosine distance</text>
+<text x="233" y="731" font-size="7" fill="#475569">chunkMetadata (start/end/page)</text>
+<text x="233" y="740" font-size="7" fill="#475569">FK → documents CASCADE</text>
+<rect x="432" y="666" width="165" height="82" rx="4" fill="#1f1200" stroke="#92400e" stroke-width="1"/>
+<text x="447" y="682" font-size="8.5" fill="#fbbf24" font-weight="600">conversations</text>
+<text x="447" y="695" font-size="7" fill="#475569">id · orgId</text>
+<text x="447" y="707" font-size="7" fill="#475569">userId (opcional)</text>
+<text x="447" y="719" font-size="7" fill="#475569">createdAt</text>
+<text x="447" y="731" font-size="7" fill="#475569">updatedAt ← ordenar</text>
+<text x="447" y="740" font-size="7" fill="#475569">por actividad reciente</text>
+<rect x="611" y="666" width="195" height="82" rx="4" fill="#1f1200" stroke="#92400e" stroke-width="1"/>
+<text x="626" y="682" font-size="8.5" fill="#fbbf24" font-weight="600">messages</text>
+<text x="626" y="695" font-size="7" fill="#475569">role: user | assistant</text>
+<text x="626" y="707" font-size="7" fill="#475569">content</text>
+<text x="626" y="719" font-size="7" fill="#475569">metadata → chunkIds usados</text>
+<text x="626" y="731" font-size="7" fill="#475569">  (auditoría/debug)</text>
+<text x="626" y="740" font-size="7" fill="#475569">FK → conversations CASCADE</text>
+<rect x="820" y="666" width="145" height="82" rx="4" fill="#1f1200" stroke="#92400e" stroke-width="1"/>
+<text x="835" y="682" font-size="8.5" fill="#fbbf24" font-weight="600">users</text>
+<text x="835" y="695" font-size="7" fill="#475569">id · email · orgId</text>
+<text x="835" y="707" font-size="7" fill="#475569">opcional</text>
+<text x="835" y="719" font-size="7" fill="#475569">mayoría de requests</text>
+<text x="835" y="731" font-size="7" fill="#475569">son anónimas</text>
+<rect x="979" y="666" width="129" height="82" rx="4" fill="#1f1200" stroke="#92400e" stroke-width="1"/>
+<text x="989" y="682" font-size="8.5" fill="#fbbf24" font-weight="600">Mastra Memory</text>
+<text x="989" y="695" font-size="7" fill="#475569">schema: "mastra"</text>
+<text x="989" y="707" font-size="7" fill="#475569">separado del</text>
+<text x="989" y="719" font-size="7" fill="#475569">schema de app</text>
+<text x="989" y="731" font-size="7" fill="#7c3aed">historial de chat</text>
+<text x="989" y="740" font-size="7" fill="#7c3aed">PostgresStore</text>
+
+<line x1="570" y1="760" x2="570" y2="780" stroke="#92400e" stroke-width="1" marker-end="url(#arr-amber)"/>
+
+<!-- LAYER 5 — EXTERNAL APIS -->
+<rect x="20" y="785" width="1100" height="90" rx="6" fill="#1a0210" stroke="#9f1239" stroke-width="1"/>
+<rect x="20" y="785" width="4" height="90" rx="2" fill="#f43f5e"/>
+<text x="38" y="803" font-size="8.5" fill="#f43f5e" font-weight="500" letter-spacing="0.15em">CAPA 5  ·  APIS  EXTERNAS</text>
+<rect x="38" y="813" width="295" height="55" rx="4" fill="#1f0515" stroke="#9f1239" stroke-width="1"/>
+<text x="53" y="830" font-size="9" fill="#fb7185" font-weight="600">Google Gemini API</text>
+<text x="53" y="844" font-size="7.5" fill="#475569">gemini-2.5-flash → respuestas LLM</text>
+<text x="53" y="857" font-size="7.5" fill="#475569">gemini-embedding-001 → vector[768] · RETRIEVAL_QUERY / RETRIEVAL_DOCUMENT</text>
+<rect x="348" y="813" width="235" height="55" rx="4" fill="#1f0515" stroke="#9f1239" stroke-width="1"/>
+<text x="363" y="830" font-size="9" fill="#fb7185" font-weight="600">Cohere API</text>
+<text x="363" y="844" font-size="7.5" fill="#475569">rerank-english-v3.0</text>
+<text x="363" y="857" font-size="7.5" fill="#475569">cross-encoder · reordenación por relevancia real</text>
+<rect x="598" y="813" width="200" height="55" rx="4" fill="#1f0515" stroke="#9f1239" stroke-width="1"/>
+<text x="613" y="830" font-size="9" fill="#fb7185" font-weight="600">Reranker local</text>
+<text x="613" y="844" font-size="7.5" fill="#475569">sin API · fallback</text>
+<text x="613" y="857" font-size="7.5" fill="#475569">70% embed score + 30% term overlap</text>
+<rect x="813" y="813" width="295" height="55" rx="4" fill="#1f0515" stroke="#9f1239" stroke-width="1"/>
+<text x="828" y="830" font-size="9" fill="#fb7185" font-weight="600">Perplexity API</text>
+<text x="828" y="844" font-size="7.5" fill="#475569">modelo sonar · fallback web search</text>
+<text x="828" y="857" font-size="7.5" fill="#475569">solo si chunks = 0  ·  req. PERPLEXITY_API_KEY</text>
+
+<!-- LEGEND -->
+<rect x="20" y="885" width="1100" height="42" rx="4" fill="#080c14" stroke="#1e2d45" stroke-width="0.5"/>
+<text x="38" y="900" font-size="7.5" fill="#475569">flujo de chat:</text>
+<line x1="110" y1="898" x2="135" y2="898" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+<text x="140" y="901" font-size="7.5" fill="#3b82f6">→ agente</text>
+<text x="250" y="900" font-size="7.5" fill="#475569">flujo de ingesta:</text>
+<line x1="335" y1="898" x2="360" y2="898" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr-emerald)"/>
+<text x="365" y="901" font-size="7.5" fill="#10b981">→ ingesta</text>
+<text x="490" y="900" font-size="7.5" fill="#475569">memoria:</text>
+<line x1="548" y1="898" x2="573" y2="898" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arr-violet)"/>
+<text x="578" y="901" font-size="7.5" fill="#7c3aed">→ postgres</text>
+<text x="690" y="900" font-size="7.5" fill="#475569">★ tabla central con índice ivfflat pgvector</text>
+<text x="950" y="900" font-size="7.5" fill="#1e2d45">rag-agent-backbone</text>
+
+<text x="160" y="408" font-size="7" fill="#7c3aed" letter-spacing="0.08em">searchDocuments → runRetrievalPipeline()</text>
+<text x="550" y="408" font-size="7" fill="#10b981" letter-spacing="0.08em">→ ingest route</text>
+</svg>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECCIONES DETALLADAS
+     ══════════════════════════════════════════════════════════════ -->
+<div class="sections">
+
+
+  <!-- ── CAPA 0 ── -->
+  <div class="section l0">
+    <div class="section-header">
+      <div class="section-bar"></div>
+      <div>
+        <div class="section-label">Capa 0</div>
+        <div class="section-title">Entrada &amp; Configuración</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p class="intro" style="border-color:#1e2d45">
+        Antes de que llegue cualquier petición, el servidor tiene que arrancar y saber cómo comportarse.
+        Esta capa hace dos cosas: levantar el servidor HTTP y cargar todos los parámetros que controlan el comportamiento del agente.
+        Si algo falla aquí, el proceso muere antes de abrir el puerto — mejor fallar rápido que fallar en mitad de una llamada.
+      </p>
+
+      <div class="cards cards-2">
+        <div class="card l0">
+          <div class="card-file">src/index.ts</div>
+          <div class="card-title">Punto de entrada del servidor</div>
+          <p>Es el primer fichero que se ejecuta cuando arranca la aplicación. Hace tres comprobaciones antes de abrir el puerto: verifica que existe la clave de Google (sin ella no hay embeddings ni LLM), activa la extensión pgvector en PostgreSQL (sin ella no hay búsqueda vectorial), y finalmente abre el servidor en el puerto 3000.</p>
+          <p>También registra tres middlewares globales que se aplican a todas las peticiones sin excepción: un logger que imprime cada request en consola, cabeceras de seguridad HTTP estándar, y la política CORS que controla qué dominios pueden llamar a la API.</p>
+          <p>Si cualquier error no controlado llega hasta aquí, lo captura, lo loguea y devuelve un 500 genérico sin exponer información interna.</p>
+        </div>
+
+        <div class="card l0">
+          <div class="card-file">src/config/rag.config.ts</div>
+          <div class="card-title">Configuración central del agente</div>
+          <p>Un único objeto — <code>ragConfig</code> — que contiene todos los parámetros que controlan cómo funciona el sistema. El resto del código lee de aquí en lugar de tener números o strings hardcodeados.</p>
+          <p><strong>topK</strong> (por defecto 5): cuántos fragmentos de documentos recuperar por cada pregunta. Más = más contexto pero más coste.<br>
+          <strong>similarityThreshold</strong> (0.7): puntuación mínima para considerar un fragmento relevante. Un fragmento con 0.5 de similitud se descarta directamente.<br>
+          <strong>queryEnhancement</strong>: si la búsqueda inicial falla, qué estrategia usar para reformular la pregunta y buscar de nuevo.<br>
+          <strong>enableReranking</strong>: si después de recuperar fragmentos se aplica un segundo modelo más potente para reordenarlos.</p>
+          <p>Los <strong>useCasePresets</strong> son configuraciones predefinidas por tipo de caso de uso. Si se configura el agente como "customer-support", automáticamente activa multi-query y reranking sin tener que cambiar nada más.</p>
+        </div>
+
+        <div class="card l0">
+          <div class="card-file">src/config/tools.config.ts</div>
+          <div class="card-title">Registro de herramientas activas</div>
+          <p>Controla qué herramientas tiene disponibles el agente. Si una herramienta no está en este fichero marcada como <code>enabled: true</code>, el agente no sabe que existe y nunca intentará llamarla.</p>
+          <p><strong>searchDocuments</strong> siempre está activa — es la herramienta principal de búsqueda en los documentos propios.<br>
+          <strong>searchWeb</strong> solo se activa si existe la variable de entorno <code>PERPLEXITY_API_KEY</code>. Si no hay clave, la herramienta no se registra y el sistema no tiene fallback a internet.</p>
+          <p>Esta separación permite habilitar o deshabilitar funcionalidades solo cambiando variables de entorno, sin tocar código.</p>
+        </div>
+
+        <div class="card l0">
+          <div class="card-file">Arranque en local</div>
+          <div class="card-title">Cómo levantar el sistema</div>
+          <p>Se necesitan dos terminales y la base de datos corriendo:</p>
+          <p><strong>Terminal 1 — API:</strong> <code>npm run dev</code> en la raíz del proyecto. Levanta el servidor con hot reload en <code>localhost:3000</code>.</p>
+          <p><strong>Terminal 2 — Frontend:</strong> <code>npm run dev</code> dentro de la carpeta <code>frontend/</code>. Levanta la interfaz visual en <code>localhost:5173</code>.</p>
+          <p><strong>Base de datos:</strong> <code>podman start ecstatic-meninsky_postgres_1</code> si el contenedor ya existe, o <code>docker-compose up</code> para crearlo por primera vez.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── CAPA 1 ── -->
+  <div class="section l1">
+    <div class="section-header">
+      <div class="section-bar"></div>
+      <div>
+        <div class="section-label">Capa 1</div>
+        <div class="section-title">API HTTP</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p class="intro" style="border-color:#1e3a5f">
+        La API es la puerta de entrada al sistema. Todo lo que quiera hablar con el agente — una app móvil, una web, un script de automatización — lo hace a través de estos endpoints HTTP.
+        Están construidos con Hono, un framework web ligero optimizado para edge computing.
+        Cada endpoint valida la entrada con Zod antes de procesarla: si el formato es incorrecto, devuelve un error 400 inmediatamente sin llegar nunca al agente.
+      </p>
+
+      <div class="cards cards-2">
+        <div class="card l1">
+          <div class="card-file">POST /chat — src/api/chat.ts</div>
+          <div class="card-title">Pregunta al agente y espera la respuesta completa</div>
+          <p>El endpoint principal. Recibe la pregunta del usuario, la pasa al agente, y devuelve la respuesta completa cuando el agente termina de pensar.</p>
+          <p>Flujo interno: valida el body con Zod → busca o crea una conversación en base de datos → llama a <code>ragAgent.generate()</code> que puede tardar varios segundos → extrae las fuentes de los pasos intermedios del agente → guarda la pregunta y la respuesta en base de datos → devuelve todo junto.</p>
+          <p>La respuesta incluye el texto de la respuesta, las fuentes con sus fragmentos, el ID de conversación para continuar el hilo, y metadatos como el modelo usado y cuántos fragmentos se recuperaron.</p>
+        </div>
+
+        <div class="card l1">
+          <div class="card-file">GET /chat/stream — src/api/chat.ts</div>
+          <div class="card-title">Pregunta al agente con respuesta token a token</div>
+          <p>Mismo proceso que POST /chat pero usando SSE (Server-Sent Events). En lugar de esperar la respuesta completa, el servidor va enviando eventos en tiempo real mientras el agente trabaja.</p>
+          <p>El orden de los eventos es siempre el mismo: primero llega un evento <code>sources</code> con los fragmentos encontrados (antes de que el LLM empiece a escribir), luego llegan múltiples eventos <code>text</code> con cada fragmento de texto a medida que el modelo lo genera, y al final llega <code>done</code>.</p>
+          <p>Si algo falla durante el stream, se emite un evento <code>error</code> seguido igualmente de <code>done</code>, para que el cliente siempre sepa cuándo ha terminado.</p>
+          <div class="tags">
+            <span class="tag">sources → text → done</span>
+            <span class="tag">Content-Type: text/event-stream</span>
+          </div>
+        </div>
+
+        <div class="card l1">
+          <div class="card-file">POST /ingest — src/api/ingest.ts</div>
+          <div class="card-title">Añadir documentos a la base de conocimiento</div>
+          <p>Recibe la ruta de un fichero local o una URL y lo procesa para indexarlo. Acepta PDFs, Markdown, HTML, texto plano, ficheros de código, o cualquier URL pública.</p>
+          <p>El proceso es asíncrono en el sentido de que puede tardar bastante si el documento es grande (hay que dividirlo, generar embeddings para cada fragmento y guardarlos). Cuando devuelve respuesta, el documento ya está indexado y disponible para búsquedas.</p>
+          <p>Acepta un parámetro <code>orgId</code> para asociar el documento a un cliente o proyecto concreto, de modo que las búsquedas se puedan filtrar por organización.</p>
+        </div>
+
+        <div class="card l1">
+          <div class="card-file">GET /health — src/api/health.ts</div>
+          <div class="card-title">Verificar que el sistema funciona</div>
+          <p>Hace una query mínima a la base de datos (<code>SELECT 1</code>) para verificar que la conexión funciona. Si la DB está caída, devuelve 503. Si todo está bien, devuelve 200 con un timestamp.</p>
+          <p>Los sistemas de monitorización y los balanceadores de carga llaman a este endpoint periódicamente para saber si el servidor está sano. En Railway o cualquier plataforma cloud, si este endpoint falla repetidamente, la plataforma reinicia el contenedor automáticamente.</p>
+        </div>
+      </div>
+
+      <div class="callout l1">
+        <strong>Validación con Zod:</strong> todos los endpoints validan el input antes de procesarlo. Las queries de chat tienen un máximo de 10.000 caracteres. Los IDs de conversación deben ser UUIDs válidos. Si llega un body malformado o un parámetro con el tipo incorrecto, el servidor responde 400 sin llegar a tocar el agente ni la base de datos.
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── CAPA 2 ── -->
+  <div class="section l2">
+    <div class="section-header">
+      <div class="section-bar"></div>
+      <div>
+        <div class="section-label">Capa 2</div>
+        <div class="section-title">Agente Mastra</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p class="intro" style="border-color:#3730a3">
+        El agente es el cerebro del sistema. No es un flujo rígido de pasos — es un LLM (Gemini) que lee la pregunta del usuario, decide qué herramientas llamar y en qué orden, interpreta los resultados, y genera la respuesta.
+        Mastra es el framework que conecta el LLM con las herramientas, gestiona la memoria de conversación, y proporciona observabilidad sobre lo que hace el agente en cada paso.
+      </p>
+
+      <div class="cards cards-2">
+        <div class="card l2">
+          <div class="card-file">src/agent/rag-agent.ts</div>
+          <div class="card-title">Definición del agente</div>
+          <p>Aquí se ensambla todo: el LLM, las herramientas disponibles, las instrucciones de comportamiento, y la memoria. El resultado es <code>ragAgent</code>, un objeto que expone dos métodos: <code>generate()</code> para respuestas completas y <code>stream()</code> para respuestas en tiempo real.</p>
+          <p>Las <strong>instrucciones</strong> son el system prompt: un conjunto de reglas numeradas en orden de prioridad estricta. Primero responde saludos sin llamar tools. Segundo, para preguntas reales siempre llama <code>searchDocuments</code>. Tercero, si encuentra fragmentos los usa y no llama <code>searchWeb</code>. Solo si no hay fragmentos usa la búsqueda web. Nunca inventa información. Siempre cita las fuentes.</p>
+          <p>El orden importa: sin estas reglas el LLM toma atajos, como responder de su conocimiento general en lugar de buscar en los documentos.</p>
+        </div>
+
+        <div class="card l2">
+          <div class="card-file">src/agent/rag-agent.ts — Memory</div>
+          <div class="card-title">Memoria de conversación</div>
+          <p>El agente recuerda los mensajes anteriores de cada conversación. La memoria está respaldada en PostgreSQL (en un schema separado llamado "mastra" para no mezclarse con las tablas de la aplicación).</p>
+          <p>Configurada con <strong>ventana fija</strong>: guarda los últimos N mensajes (N = <code>windowSize × 2</code> porque cada turno tiene un mensaje de usuario y uno de asistente). Los mensajes más antiguos se descartan sin resumir.</p>
+          <p>Esto permite que el agente tenga contexto de la conversación: si el usuario pregunta "¿y qué más?" o "explícame el punto 2", el agente sabe a qué se refiere porque tiene los mensajes anteriores disponibles.</p>
+        </div>
+
+        <div class="card l2">
+          <div class="card-file">src/agent/tools/search-documents.ts</div>
+          <div class="card-title">Herramienta principal: buscar en documentos</div>
+          <p>La herramienta que el agente llama para cualquier pregunta factual. El LLM decide cuándo llamarla y con qué parámetros — puede reformular la pregunta antes de buscar si cree que una versión diferente dará mejores resultados.</p>
+          <p>Internamente delega en <code>runRetrievalPipeline()</code>, que hace el trabajo pesado: convertir la pregunta en vector, buscar en pgvector, expandir si hace falta, reranquear. La tool solo formatea los resultados para devolvérselos al LLM.</p>
+          <p>Acepta filtros opcionales: <code>orgId</code> para buscar solo en documentos de un cliente concreto, <code>documentIds</code> para restringir la búsqueda a documentos específicos.</p>
+        </div>
+
+        <div class="card l2">
+          <div class="card-file">src/agent/tools/search-web.ts</div>
+          <div class="card-title">Herramienta de fallback: búsqueda web</div>
+          <p>Solo entra en juego cuando <code>searchDocuments</code> devuelve cero fragmentos relevantes. Llama a la API de Perplexity (modelo Sonar) que sintetiza resultados de múltiples fuentes web en una respuesta coherente con sus citas.</p>
+          <p>Si no hay <code>PERPLEXITY_API_KEY</code> configurada, la herramienta devuelve <code>available: false</code> y el agente lo interpreta como "búsqueda web no disponible".</p>
+          <p>El agente siempre informa al usuario cuando la respuesta viene de internet en lugar de los documentos propios.</p>
+        </div>
+      </div>
+
+      <div class="callout l2">
+        <strong>¿Cómo decide el agente qué tool llamar?</strong> El LLM recibe el system prompt con las reglas, la pregunta del usuario, y la lista de tools disponibles con sus descripciones. Elige qué llamar basándose en las instrucciones y en el contenido de la pregunta. Después de recibir el resultado de la tool, decide si ya tiene suficiente información para responder o si necesita llamar a otra tool. Todo este proceso ocurre dentro de un único <code>ragAgent.generate()</code>.
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── CAPA 3a ── -->
+  <div class="section l3a">
+    <div class="section-header">
+      <div class="section-bar"></div>
+      <div>
+        <div class="section-label">Capa 3a</div>
+        <div class="section-title">Pipeline de Retrieval</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p class="intro" style="border-color:#0e7490">
+        RAG significa Retrieval-Augmented Generation: generar respuestas aumentadas con información recuperada. Esta capa es la parte de "recuperación". Su trabajo es, dada una pregunta en texto natural, encontrar los fragmentos de documentos más relevantes para esa pregunta.
+        No busca por palabras clave — busca por significado semántico. Y si la búsqueda inicial no da suficientes resultados, tiene estrategias para ampliar el recall automáticamente.
+      </p>
+
+      <div class="flow">
+        <div class="flow-step l3a">
+          <div class="step-num">Paso 1</div>
+          <div class="step-name">Embed</div>
+          <div class="step-desc">La pregunta en texto se convierte en un vector de 768 números. Este vector captura el significado semántico: preguntas sobre el mismo tema tendrán vectores parecidos aunque usen palabras distintas.</div>
+        </div>
+        <div class="flow-step l3a">
+          <div class="step-num">Paso 2</div>
+          <div class="step-name">Retrieve</div>
+          <div class="step-desc">Se buscan en pgvector los fragmentos cuyo vector sea más cercano al de la pregunta. La "cercanía" se mide con distancia coseno. Solo se devuelven fragmentos con score superior al umbral configurado.</div>
+        </div>
+        <div class="flow-step l3a">
+          <div class="step-num">Paso 3 (condicional)</div>
+          <div class="step-name">Expand</div>
+          <div class="step-desc">Si se recuperan menos de 3 fragmentos, se reformula la pregunta de varias maneras (multi-query, HyDE, step-back) y se repite la búsqueda. Los resultados se fusionan eliminando duplicados.</div>
+        </div>
+        <div class="flow-step l3a">
+          <div class="step-num">Paso 4</div>
+          <div class="step-name">Rerank</div>
+          <div class="step-desc">Si el reranking está activado, un segundo modelo evalúa cada fragmento directamente contra la pregunta y los reordena por relevancia real. Mejora la precisión ~20-35%.</div>
+        </div>
+      </div>
+
+      <div class="cards cards-2">
+        <div class="card l3a">
+          <div class="card-file">src/rag/embeddings.ts — createEmbedding()</div>
+          <div class="card-title">¿Qué es un embedding y para qué sirve?</div>
+          <p>Un embedding es una representación matemática del significado de un texto. Se convierte el texto en una lista de 768 números donde textos similares producen listas de números similares.</p>
+          <p>Por ejemplo, "¿qué puedo cenar hoy?" y "ideas para la cena de esta noche" producirán vectores muy parecidos aunque no compartan ninguna palabra. Esto permite encontrar documentos relevantes aunque el usuario use un vocabulario distinto al del documento.</p>
+          <p>Usa Gemini <code>gemini-embedding-001</code> por defecto. Si no hay clave de Google pero sí de OpenAI, cambia automáticamente a <code>text-embedding-3-small</code>. La dimensión del vector (768) tiene que coincidir con la columna en la base de datos.</p>
+        </div>
+
+        <div class="card l3a">
+          <div class="card-file">src/rag/retriever.ts — retrieve()</div>
+          <div class="card-title">Búsqueda vectorial en PostgreSQL</div>
+          <p>Ejecuta una query SQL especial que usa el operador <code>&lt;=&gt;</code> de pgvector para calcular la distancia coseno entre el vector de la pregunta y los vectores de todos los fragmentos almacenados.</p>
+          <p>La fórmula es <code>1 - distancia = similitud</code>. Un score de 1.0 significa que los vectores son idénticos. Un score de 0.7 (el umbral por defecto) significa que son bastante similares. Por debajo del umbral, el fragmento se descarta aunque aparezca en los resultados del índice.</p>
+          <p>Solo busca en fragmentos de documentos con <code>status = "indexed"</code>. Los documentos en proceso de ingesta o que fallaron no aparecen en las búsquedas.</p>
+        </div>
+
+        <div class="card l3a">
+          <div class="card-file">src/rag/query-transformer.ts — transformQuery()</div>
+          <div class="card-title">Estrategias de expansión de query</div>
+          <p><strong>Multi-query:</strong> pide al LLM que reformule la pregunta de N maneras distintas. "¿qué recetas hay con pollo?" genera también "platos con pollo", "cómo cocinar pollo", etc. Se busca con todas y se fusionan los resultados. Mejora el recall ~20-30%.</p>
+          <p><strong>HyDE (Hypothetical Document Embeddings):</strong> en lugar de buscar con la pregunta, genera una respuesta hipotética de ~100 palabras y la usa como query. La lógica: el embedding de una respuesta se parece más al embedding del documento que contiene la respuesta que el embedding de la pregunta.</p>
+          <p><strong>Step-back:</strong> generaliza la pregunta a una más amplia. "¿cuántas calorías tiene una tortilla de 3 huevos?" → "información nutricional de los huevos". Recupera contexto general que puede contener la respuesta específica.</p>
+        </div>
+
+        <div class="card l3a">
+          <div class="card-file">src/rag/reranker.ts — rerank()</div>
+          <div class="card-title">Reordenación por relevancia real</div>
+          <p>El retrieval vectorial recupera fragmentos semánticamente similares, pero la similitud semántica no es lo mismo que "responde la pregunta". El reranker usa un modelo cross-encoder que evalúa cada par (pregunta, fragmento) de forma directa.</p>
+          <p><strong>Cohere API:</strong> modelo <code>rerank-english-v3.0</code>. Calidad alta. Requiere <code>COHERE_API_KEY</code>. Añade ~200ms de latencia pero mejora la precisión notablemente.</p>
+          <p><strong>Reranker local:</strong> sin API externa. Combina el score de embedding original (70%) con el solapamiento de palabras clave entre la pregunta y el fragmento (30%). Más rápido pero menos preciso.</p>
+          <p>Para que el reranker tenga buenos candidatos, el retriever recupera <code>topK × 3</code> fragmentos cuando el reranking está activo, y el reranker devuelve solo los mejores <code>topK</code>.</p>
+        </div>
+
+        <div class="card l3a">
+          <div class="card-file">src/rag/chunker.ts — chunk()</div>
+          <div class="card-title">División de documentos en fragmentos</div>
+          <p>Los documentos se dividen en fragmentos antes de indexarlos porque los modelos de embedding tienen un límite de tokens, y porque fragmentos pequeños dan resultados de búsqueda más precisos que documentos completos.</p>
+          <p><strong>Fixed (por defecto):</strong> fragmentos de tamaño fijo con overlap. El overlap (~50 tokens) garantiza que una idea que cruza el borde entre dos fragmentos aparece en ambos, evitando perder información en las juntas.</p>
+          <p><strong>Semantic:</strong> divide por párrafos y encabezados markdown. Respeta la estructura del documento en lugar de cortar cada N caracteres.</p>
+          <p><strong>Hierarchical:</strong> detecta secciones por encabezados, divide dentro de cada sección con fixed, y guarda el nombre de la sección en los metadatos de cada fragmento.</p>
+        </div>
+
+        <div class="card l3a">
+          <div class="card-file">src/rag/interfaces.ts + adapters.ts</div>
+          <div class="card-title">Contratos e implementaciones intercambiables</div>
+          <p>Los interfaces (<code>IEmbedder</code>, <code>IRetriever</code>, <code>IReranker</code>) definen qué métodos tiene que tener cada componente, sin decir cómo están implementados. El pipeline solo habla con estas interfaces.</p>
+          <p>Los adapters son las implementaciones concretas que cumplen esos contratos: <code>defaultEmbedder</code> usa Gemini, <code>pgvectorRetriever</code> usa PostgreSQL, <code>defaultReranker</code> usa Cohere o local.</p>
+          <p>Para cambiar de proveedor de embeddings solo hay que modificar <code>adapters.ts</code> — el pipeline, las tools, y el workflow no necesitan tocarse porque solo conocen los interfaces.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── CAPA 3b ── -->
+  <div class="section l3b">
+    <div class="section-header">
+      <div class="section-bar"></div>
+      <div>
+        <div class="section-label">Capa 3b</div>
+        <div class="section-title">Ingesta de Documentos</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p class="intro" style="border-color:#065f46">
+        Para que el agente pueda responder preguntas sobre documentos, primero hay que indexar esos documentos. La ingesta es el proceso de tomar un fichero o URL, extraer su texto, dividirlo en fragmentos manejables, generar un vector para cada fragmento, y guardar todo en la base de datos. Una vez indexado, el retriever puede encontrarlo en milisegundos.
+      </p>
+
+      <div class="cards cards-2">
+        <div class="card l3b">
+          <div class="card-file">src/ingestion/loader.ts — loadDocument()</div>
+          <div class="card-title">Extracción de texto según el tipo de fichero</div>
+          <p>Detecta automáticamente qué tipo de fuente es y usa el método de extracción adecuado para cada una.</p>
+          <p><strong>PDF:</strong> usa <code>pdfjs-dist</code> para extraer el texto página por página. La importación es dinámica (solo se carga la librería si hay un PDF que procesar).</p>
+          <p><strong>Markdown:</strong> lee el fichero como texto y extrae el título del primer encabezado <code>#</code>.</p>
+          <p><strong>HTML/URL:</strong> usa Cheerio (el jQuery del servidor) para parsear el HTML. Elimina automáticamente elementos de navegación, scripts, estilos, cabeceras y pies de página para quedarse solo con el contenido relevante.</p>
+          <p><strong>Código:</strong> cualquier extensión no reconocida se trata como código fuente. Añade el nombre del fichero como comentario al principio para que el agente sepa de qué fichero viene cada fragmento.</p>
+        </div>
+
+        <div class="card l3b">
+          <div class="card-file">src/ingestion/processor.ts — processDocument()</div>
+          <div class="card-title">El pipeline completo de ingesta</div>
+          <p>Recibe el documento cargado y lo procesa en cuatro pasos secuenciales.</p>
+          <p><strong>1. Registro en DB:</strong> antes de hacer nada, crea un registro en la tabla <code>documents</code> con <code>status = "processing"</code>. Si el proceso falla a mitad, queda registrado en base de datos con el error en los metadatos. Sin esto, no habría forma de saber qué documentos fallaron.</p>
+          <p><strong>2. Chunking:</strong> divide el texto usando la estrategia configurada en <code>ragConfig</code>.</p>
+          <p><strong>3. Embedding en lotes:</strong> genera vectores para todos los fragmentos en lotes de 20. Los lotes limitan las llamadas paralelas a la API de Gemini para no superar los rate limits. Dentro de cada lote se usa <code>Promise.all()</code> para paralelizar y ir rápido.</p>
+          <p><strong>4. Insert y marcado:</strong> inserta todos los fragmentos con sus vectores en la tabla <code>document_chunks</code> y actualiza el documento a <code>status = "indexed"</code>.</p>
+        </div>
+      </div>
+
+      <div class="callout l3b">
+        <strong>¿Por qué el ciclo de estados?</strong> Un documento pasa por <code>pending → processing → indexed</code> (o <code>failed</code>). El retriever solo busca en documentos con <code>status = "indexed"</code>. Esto garantiza que un documento que se está procesando o que falló a mitad nunca aparece en los resultados de búsqueda con datos incompletos.
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── CAPA 4 ── -->
+  <div class="section l4">
+    <div class="section-header">
+      <div class="section-bar"></div>
+      <div>
+        <div class="section-label">Capa 4</div>
+        <div class="section-title">Persistencia — PostgreSQL + pgvector</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p class="intro" style="border-color:#92400e">
+        Todo el estado del sistema vive en una única base de datos PostgreSQL con la extensión pgvector instalada. PostgreSQL gestiona los datos relacionales (conversaciones, mensajes, documentos). pgvector añade el tipo de dato <code>vector</code> y los operadores de búsqueda por similitud. Un solo <code>DATABASE_URL</code> lo conecta todo.
+      </p>
+
+      <div class="cards cards-3">
+        <div class="card l4">
+          <div class="card-file">tabla: document_chunks ★</div>
+          <div class="card-title">La tabla más importante del sistema</div>
+          <p>Cada fila es un fragmento de texto con su vector de embedding. La columna <code>embedding vector(768)</code> almacena los 768 números que representan semánticamente ese fragmento.</p>
+          <p>El índice <code>ivfflat</code> sobre esa columna es lo que hace la búsqueda vectorial rápida. Sin él, cada búsqueda haría un scan completo de todos los fragmentos. Con él, encuentra los más similares en milisegundos incluso con millones de filas.</p>
+          <p>El operador <code>&lt;=&gt;</code> calcula la distancia coseno entre dos vectores. Un resultado de 0 significa vectores idénticos; cuanto más cercano a 0, más similares.</p>
+        </div>
+
+        <div class="card l4">
+          <div class="card-file">tabla: documents</div>
+          <div class="card-title">Registro de cada documento ingestado</div>
+          <p>Guarda la ficha de cada documento: título, fuente original (ruta o URL), tipo de contenido, y el estado actual del proceso de ingesta.</p>
+          <p>El campo <code>orgId</code> permite asociar documentos a un cliente o proyecto. Las búsquedas pueden filtrarse por este campo para que cada cliente solo vea sus propios documentos.</p>
+          <p>El campo <code>chunkCount</code> guarda cuántos fragmentos se generaron, útil para diagnóstico. El campo <code>indexedAt</code> registra cuándo se completó la indexación.</p>
+        </div>
+
+        <div class="card l4">
+          <div class="card-file">tablas: conversations + messages</div>
+          <div class="card-title">Historial de conversaciones</div>
+          <p>Cada conversación es un hilo de mensajes. Cuando un usuario hace varias preguntas relacionadas, todas van a la misma conversación y el agente tiene contexto de las anteriores.</p>
+          <p>El campo <code>updatedAt</code> en conversations se actualiza en cada mensaje nuevo, lo que permite ordenar las conversaciones por actividad reciente.</p>
+          <p>Los mensajes del asistente guardan en <code>metadata</code> los IDs de los fragmentos que se usaron para generar la respuesta. Esto permite auditar de dónde vino cada respuesta.</p>
+          <p>La relación es en cascada: borrar una conversación borra automáticamente todos sus mensajes.</p>
+        </div>
+
+        <div class="card l4">
+          <div class="card-file">tabla: users (opcional)</div>
+          <div class="card-title">Usuarios — opcional</div>
+          <p>La tabla de usuarios existe para cuando se necesita autenticación, pero no es requerida para que el sistema funcione. La mayoría de las peticiones son anónimas: el agente responde sin necesidad de saber quién pregunta.</p>
+          <p>Si se activa autenticación, los usuarios se asocian a conversaciones y se pueden filtrar documentos por usuario además de por <code>orgId</code>.</p>
+        </div>
+
+        <div class="card l4">
+          <div class="card-file">schema: "mastra"</div>
+          <div class="card-title">Memoria del agente (Mastra)</div>
+          <p>Mastra guarda su propio historial de conversación en la misma base de datos pero en un schema separado llamado "mastra". Esto evita conflictos entre las tablas de la aplicación y las tablas internas de Mastra.</p>
+          <p>La diferencia con la tabla <code>messages</code>: la tabla de la aplicación guarda los mensajes para mostrarlos en el frontend. El schema de Mastra guarda el historial que el agente recibe como contexto al procesar cada pregunta.</p>
+        </div>
+
+        <div class="card l4">
+          <div class="card-file">src/db/schema.ts + client.ts</div>
+          <div class="card-title">ORM Drizzle — cómo se define el schema</div>
+          <p>Las tablas se definen en TypeScript con Drizzle ORM. Drizzle genera el SQL necesario para crear y migrar las tablas.</p>
+          <p>Todas las PKs son UUIDs generados automáticamente (no enteros incrementales). Todos los timestamps incluyen timezone. Los campos JSON usan <code>jsonb</code> con tipos TypeScript para type-safety.</p>
+          <p>Las migraciones se aplican con <code>npm run migrate</code> y nunca se modifican una vez creadas — cada cambio al schema genera una nueva migración.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── CAPA 5 ── -->
+  <div class="section l5">
+    <div class="section-header">
+      <div class="section-bar"></div>
+      <div>
+        <div class="section-label">Capa 5</div>
+        <div class="section-title">APIs Externas</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p class="intro" style="border-color:#9f1239">
+        El sistema delega tres tipos de trabajo en APIs externas: la generación de texto (el LLM), la generación de vectores (embeddings), y la búsqueda web de fallback. Sin estas APIs no hay inteligencia — son la capa que convierte texto en comprensión semántica y genera las respuestas. Cada API requiere su propia clave de acceso en el fichero <code>.env</code>.
+      </p>
+
+      <div class="cards cards-2">
+        <div class="card l5">
+          <div class="card-file">Google Gemini API — GOOGLE_API_KEY</div>
+          <div class="card-title">LLM y embeddings (la API más importante)</div>
+          <p>Se usa para dos propósitos distintos del mismo proveedor:</p>
+          <p><strong>Generación de texto</strong> (<code>gemini-2.5-flash</code>): el LLM que razona, decide qué tools llamar, y genera la respuesta final. Es el modelo más capaz de la familia Flash de Gemini — rápido, eficiente y con ventana de contexto grande.</p>
+          <p><strong>Embeddings</strong> (<code>gemini-embedding-001</code>): convierte texto en vectores de 768 dimensiones. Se usa tanto al ingestar documentos (para indexar cada fragmento) como al buscar (para vectorizar la pregunta). El parámetro <code>taskType</code> le indica a la API si el vector es para indexar (<code>RETRIEVAL_DOCUMENT</code>) o para buscar (<code>RETRIEVAL_QUERY</code>) — Gemini optimiza el vector según el uso.</p>
+          <div class="tags">
+            <span class="tag">GOOGLE_API_KEY requerida</span>
+            <span class="tag">sin esta key el servidor no arranca</span>
+          </div>
+        </div>
+
+        <div class="card l5">
+          <div class="card-file">Cohere API — COHERE_API_KEY (opcional)</div>
+          <div class="card-title">Reranking de calidad con cross-encoder</div>
+          <p>El modelo <code>rerank-english-v3.0</code> de Cohere es un cross-encoder: en lugar de comparar vectores, evalúa cada par (pregunta completa, fragmento completo) de forma directa y asigna un score de relevancia.</p>
+          <p>Esto es mucho más preciso que la similitud vectorial porque el modelo entiende la relación semántica entre la pregunta y el contenido del fragmento, no solo si "hablan de lo mismo".</p>
+          <p>Si no hay <code>COHERE_API_KEY</code>, el sistema usa automáticamente el reranker local que combina el score de embedding con solapamiento de palabras clave. Funciona, pero con menor precisión.</p>
+        </div>
+
+        <div class="card l5">
+          <div class="card-file">Perplexity API — PERPLEXITY_API_KEY (opcional)</div>
+          <div class="card-title">Búsqueda web como fallback</div>
+          <p>Solo entra en juego cuando la base de conocimiento propia no tiene información relevante (el retriever devuelve 0 fragmentos). En ese caso, el agente llama a Perplexity para buscar en internet.</p>
+          <p>Perplexity usa su modelo Sonar, que sintetiza resultados de múltiples fuentes web en una respuesta coherente con las citas de origen incluidas.</p>
+          <p>Si no hay <code>PERPLEXITY_API_KEY</code>, la herramienta <code>searchWeb</code> no se registra y el agente responde que no tiene información disponible cuando el retrieval falla.</p>
+          <div class="tags">
+            <span class="tag">solo si searchDocuments devuelve 0 chunks</span>
+          </div>
+        </div>
+
+        <div class="card l5">
+          <div class="card-file">Variables de entorno — .env</div>
+          <div class="card-title">Resumen de claves necesarias</div>
+          <p><strong>Mínimo para funcionar en local:</strong></p>
+          <p><code>DATABASE_URL</code> — conexión a PostgreSQL con pgvector<br>
+          <code>GOOGLE_API_KEY</code> — para Gemini (LLM + embeddings)</p>
+          <p><strong>Opcionales para funcionalidad extra:</strong></p>
+          <p><code>COHERE_API_KEY</code> — reranking de calidad (si no, usa local)<br>
+          <code>PERPLEXITY_API_KEY</code> — búsqueda web fallback<br>
+          <code>GEMINI_MODEL</code> — cambiar el modelo de Gemini (por defecto: gemini-2.5-flash)<br>
+          <code>ALLOWED_ORIGINS</code> — dominios permitidos en CORS (producción)</p>
+          <div class="tags">
+            <span class="tag">nunca hardcodear claves en el código</span>
+            <span class="tag">.env está en .gitignore</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+</div><!-- /sections -->
+</body>
+</html>

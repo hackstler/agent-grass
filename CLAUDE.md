@@ -51,15 +51,32 @@ Clona el repo, ejecuta `/setup` en Claude Code, y tienes el agente configurado y
 → código generado + tsc validado
 ```
 
+## Arquitectura (Clean / Hexagonal)
+
+```
+Domain (entities, errors, ports)    ← cero dependencias externas
+  ↑
+Application (managers / use cases)  ← solo importa de domain
+  ↑
+Infrastructure (db, repositories)   ← implementa los ports
+  ↑
+API (controllers, middleware)       ← orquesta application + infrastructure
+```
+
 ## Estructura clave
 ```
-src/api/           → Hono routes (chat, ingest, conversations, health)
-src/rag/           → interfaces.ts + adapters.ts + retriever + reranker + chunker
-src/agent/         → rag-agent.ts + workflow.ts
-src/agent/tools/   → tool factory pattern (ToolEntry)
-src/ingestion/     → Document ingestion (loader, processor)
-src/db/            → Drizzle schema + migrations + client
-src/config/        → rag.config.ts + tools.config.ts
+src/domain/entities/   → Interfaces puras de entidades (User, Document, Topic, etc.)
+src/domain/errors/     → DomainError + subclases (NotFoundError, ConflictError, etc.)
+src/domain/ports/      → Interfaces de repositorios (UserRepository, etc.)
+src/application/       → Managers / use cases (UserManager, DocumentManager, etc.)
+src/infrastructure/db/ → Drizzle schema, client, migrations, seed
+src/infrastructure/repositories/ → Implementaciones Drizzle de los ports
+src/api/               → Hono controllers, middleware, routes (chat, ingest, health)
+src/rag/               → interfaces.ts + adapters.ts + retriever + reranker + chunker
+src/agent/             → rag-agent.ts + workflow.ts
+src/agent/tools/       → tool factory pattern (ToolEntry)
+src/ingestion/         → Document ingestion (loader, processor)
+src/config/            → rag.config.ts + tools.config.ts
 ```
 
 ## Convenciones
@@ -68,6 +85,9 @@ src/config/        → rag.config.ts + tools.config.ts
 - Cambiar embedder/retriever/reranker = solo modificar `src/rag/adapters.ts`
 - Secrets siempre en `.env`, nunca hardcoded — usar `process.env["VAR"]` (con corchetes)
 - Local ↔ Producción: mismo código, solo variables de entorno cambian
+- **Error responses**: `{ error: "Category", message: "detail" }` (e.g. `{ error: "NotFound", message: "User 'abc' not found" }`)
+- **Domain entities**: definir en `src/domain/entities/` — domain y application NUNCA importan de infrastructure
+- **Repository pattern**: interfaces en `src/domain/ports/repositories/`, implementaciones en `src/infrastructure/repositories/`
 
 ## Comandos npm
 ```bash

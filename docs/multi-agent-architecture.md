@@ -55,12 +55,14 @@ Su sistema de research interno usa Lead Agent (Opus) + Subagentes (Sonnet):
 ```typescript
 // src/agent/rag-agent.ts
 export const ragAgent = new Agent({
-  id: "rag-agent",
-  tools: createToolRegistry(deps),  // { searchDocuments, searchWeb, booking, ... }
+  id: ragConfig.agentName,
+  tools: createToolRegistry(deps),  // { searchDocuments, saveNote, searchWeb }
   memory,
   instructions: "...",
 });
 ```
+
+**Tools actuales (3):** `searchDocuments` (hybrid search), `saveNote` (ingestar URLs/notas), `searchWeb` (Perplexity fallback, condicional).
 
 **Cuándo usar:** 1-6 tools en un único dominio coherente.
 **Límite práctico:** 8 tools, o cuando el agente empiece a confundir cuándo usar cada una.

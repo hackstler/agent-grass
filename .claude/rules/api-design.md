@@ -21,8 +21,10 @@
 // Success
 { data: T }  // o directamente T si es obvio
 
-// Error
-{ error: string, message?: string }
+// Error — SIEMPRE con ambos campos
+{ error: "Category", message: "detail" }
+// Ejemplo: { error: "NotFound", message: "User 'abc' not found" }
+// Categorías: NotFound, Conflict, Validation, Unauthorized, Forbidden, InternalError
 
 // Paginado
 { items: T[], total: number, cursor?: string }

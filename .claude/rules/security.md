@@ -4,7 +4,7 @@
 - **Nunca** hardcodear API keys, passwords ni connection strings en el código.
 - Siempre usar `process.env["VAR_NAME"]` (con corchetes, no punto) para acceder a env vars.
 - El archivo `.env` está en `.gitignore`. Solo `.env.example` va al repo.
-- Validar que las env vars críticas existen al startup (ver `src/db/client.ts`).
+- Validar que las env vars críticas existen al startup (ver `src/infrastructure/db/client.ts`).
 
 ## Input Validation
 - Toda entrada del usuario pasa por Zod antes de procesarse.
