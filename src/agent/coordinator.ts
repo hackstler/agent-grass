@@ -43,26 +43,16 @@ Los mensajes del canal WhatsApp incluyen una etiqueta [org:xxx] al final del tex
 
 == PRESUPUESTOS DE CÉSPED — cuándo llamar a calculateBudget ==
 
-Llama a calculateBudget cuando el usuario quiera generar un presupuesto o factura para un cliente con artículos de césped artificial.
-
-Artículos disponibles en el catálogo:
-- Cesped verde (cód. 1) · 12 €/m²
-- Cesped amarillo (cód. 2) · 13 €/m²
-- Cesped premium (cód. 3) · 16 €/m²
-- Cesped premium ultimate (cód. 4) · 18 €/m²
-- Cesped v4 (cód. 5) · 15 €/m²
-- Cesped ecologico (cód. 6) · 16 €/m²
-- Mano de obra (cód. 7) · 10 €/m²
-- Desplazamiento (cód. 8) · 10 €/km
+Llama a calculateBudget cuando el usuario quiera generar un presupuesto o factura para un cliente.
+La herramienta consulta el catálogo de precios actualizado en la base de datos — NO inventes precios.
 
 Para llamar a calculateBudget necesitas:
 1. clientName — nombre del cliente
 2. clientAddress — dirección del cliente
-3. items — lista de artículos con { nameOrCode, quantity }
+3. items — lista de artículos con { nameOrCode, quantity }. Usa el nombre del producto tal como lo dice el usuario.
 4. orgId — extraído de la etiqueta [org:xxx] del mensaje
-5. applyVat — por defecto true (IVA 21%)
 
-Si falta algún dato obligatorio, pregunta UNA SOLA vez por los datos que faltan antes de llamar a la herramienta.
+Si falta algún dato obligatorio (nombre, dirección o artículos), pregunta UNA SOLA vez.
 
 Después de generar el presupuesto, responde con un resumen de las líneas, el total con IVA y confirma que se ha enviado el PDF.
 Si algún artículo no se encontró en el catálogo, indícalo claramente al usuario.

@@ -1,13 +1,26 @@
 import type { Plugin } from "../plugin.interface.js";
+import type { ToolsInput } from "@mastra/core/agent";
 import { pool } from "../../infrastructure/db/client.js";
-import { quoteAgent, quoteTools } from "./quote.agent.js";
+import { CatalogService } from "./services/catalog.service.js";
+import { PdfService } from "./services/pdf.service.js";
+import { createCalculateBudgetTool } from "./tools/calculate-budget.tool.js";
+import { createQuoteAgent } from "./quote.agent.js";
 
 export class QuotePlugin implements Plugin {
   readonly id = "quote";
   readonly name = "Quote Plugin";
-  readonly description = "Generates price quotes and PDF invoices for artificial grass installation. Use when the user asks to create a budget or presupuesto for a client.";
-  readonly agent = quoteAgent;
-  readonly tools = quoteTools;
+  readonly description = "Generates price quotes and PDF invoices for artificial grass installation.";
+  readonly agent;
+  readonly tools: ToolsInput;
+
+  constructor() {
+    const catalogService = new CatalogService();
+    const pdfService = new PdfService();
+    const calculateBudget = createCalculateBudgetTool({ catalogService, pdfService });
+
+    this.tools = { calculateBudget };
+    this.agent = createQuoteAgent(this.tools);
+  }
 
   async ensureTables(): Promise<void> {
     const client = await pool.connect();

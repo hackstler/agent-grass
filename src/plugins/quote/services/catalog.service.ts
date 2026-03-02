@@ -67,7 +67,7 @@ export class CatalogService {
       id: item.id,
       code: item.code,
       name: item.name,
-      pricePerUnit: parseFloat(item.pricePerUnit as unknown as string),
+      pricePerUnit: parseFloat(String(item.pricePerUnit)),
       unit: item.unit,
     };
   }
@@ -90,7 +90,7 @@ export class CatalogService {
 
     return rows.map((r) => ({
       ...r,
-      pricePerUnit: parseFloat(r.pricePerUnit as unknown as string),
+      pricePerUnit: parseFloat(String(r.pricePerUnit)),
     }));
   }
 }

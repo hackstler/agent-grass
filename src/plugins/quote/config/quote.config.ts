@@ -1,14 +1,12 @@
 export const quoteConfig = {
-  // Company details printed on the PDF header — update these with real data
-  companyName: "Tu Empresa S.L.",
-  companyAddress: "Calle Ejemplo, 1 · 28001 Madrid",
-  companyPhone: "+34 600 000 000",
-  companyNif: "B-00000000",
-  companyEmail: "info@tuempresa.com",
+  companyName:    process.env["QUOTE_COMPANY_NAME"]    ?? "Tu Empresa S.L.",
+  companyAddress: process.env["QUOTE_COMPANY_ADDRESS"] ?? "Calle Ejemplo, 1 · 28001 Madrid",
+  companyPhone:   process.env["QUOTE_COMPANY_PHONE"]   ?? "+34 600 000 000",
+  companyNif:     process.env["QUOTE_COMPANY_NIF"]     ?? "B-00000000",
+  companyEmail:   process.env["QUOTE_COMPANY_EMAIL"]   ?? "info@tuempresa.com",
 
   vatRate: 0.21,
   currency: "€",
 
-  // Agent identity
   agentName: "QuoteAgent",
 } as const;
