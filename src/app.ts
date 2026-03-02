@@ -31,7 +31,7 @@ export interface AppDependencies {
   waManager: WhatsAppManager;
   topicManager: TopicManager;
   orgManager: OrganizationManager;
-  ragAgent: Agent;
+  coordinatorAgent: Agent;
   pluginRegistry?: PluginRegistry;
 }
 
@@ -86,7 +86,7 @@ export function createApp(deps: AppDependencies): Hono {
   // Internal worker endpoints — worker JWT auth
   const workerAuth = requireWorker();
   app.use("/internal/*", workerAuth);
-  app.route("/internal", createInternalController(deps.waManager, deps.convManager, deps.ragAgent));
+  app.route("/internal", createInternalController(deps.waManager, deps.convManager, deps.coordinatorAgent));
 
   // ── 404 + error fallback ─────────────────────────────────────────────────────
   app.notFound((c) => c.json({ error: "NotFound", message: "Not found" }, 404));

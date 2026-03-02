@@ -20,6 +20,13 @@ import { OrganizationManager } from "./application/managers/organization.manager
 // Plugins
 import { PluginRegistry } from "./plugins/plugin-registry.js";
 import { RagPlugin } from "./plugins/rag/index.js";
+import { QuotePlugin } from "./plugins/quote/index.js";
+
+// Coordinator agent
+import { createCoordinatorAgent } from "./agent/coordinator.js";
+
+// Catalog seed
+import { seedCatalog } from "./infrastructure/db/seed.js";
 
 // App factory
 import { createApp } from "./app.js";
@@ -48,8 +55,12 @@ const orgManager = new OrganizationManager(userRepo, docRepo, topicRepo, session
 const pluginRegistry = new PluginRegistry();
 const ragPlugin = new RagPlugin();
 pluginRegistry.register(ragPlugin);
+pluginRegistry.register(new QuotePlugin());
 
-// 4. Create app
+// 4. Coordinator agent (uses all plugin tools)
+const coordinatorAgent = createCoordinatorAgent(pluginRegistry);
+
+// 5. Create app
 const app = createApp({
   userManager,
   docManager,
@@ -57,7 +68,7 @@ const app = createApp({
   waManager,
   topicManager,
   orgManager,
-  ragAgent: ragPlugin.agent,
+  coordinatorAgent,
   pluginRegistry,
 });
 
@@ -82,6 +93,9 @@ async function main() {
   console.log("[startup] migrations applied");
 
   await seedAdminUser();
+
+  const adminOrg = process.env["ADMIN_USERNAME"] ?? "default";
+  await seedCatalog(adminOrg);
 
   await pluginRegistry.initializeAll();
 

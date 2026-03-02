@@ -10,6 +10,8 @@ import {
   pgEnum,
   vector,
   customType,
+  boolean,
+  numeric,
 } from "drizzle-orm/pg-core";
 
 const tsvector = customType<{ data: string }>({
@@ -188,6 +190,38 @@ export const documentChunks = pgTable(
 );
 
 // ============================================================
+// Catalog (quote plugin)
+// ============================================================
+
+export const catalogs = pgTable("catalogs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: text("org_id").notNull(),
+  name: text("name").notNull(),
+  effectiveDate: timestamp("effective_date", { withTimezone: true }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const catalogItems = pgTable(
+  "catalog_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catalogId: uuid("catalog_id")
+      .notNull()
+      .references(() => catalogs.id, { onDelete: "cascade" }),
+    code: integer("code").notNull(),
+    name: text("name").notNull(),
+    pricePerUnit: numeric("price_per_unit", { precision: 10, scale: 2 }).notNull(),
+    unit: text("unit").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    catalogIdx: index("catalog_items_catalog_id_idx").on(t.catalogId),
+  })
+);
+
+// ============================================================
 // Relations
 // ============================================================
 
@@ -231,6 +265,17 @@ export const whatsappSessionsRelations = relations(whatsappSessions, ({ one }) =
   }),
 }));
 
+export const catalogsRelations = relations(catalogs, ({ many }) => ({
+  items: many(catalogItems),
+}));
+
+export const catalogItemsRelations = relations(catalogItems, ({ one }) => ({
+  catalog: one(catalogs, {
+    fields: [catalogItems.catalogId],
+    references: [catalogs.id],
+  }),
+}));
+
 // ============================================================
 // Types
 // ============================================================
@@ -249,3 +294,7 @@ export type DocumentChunk = typeof documentChunks.$inferSelect;
 export type NewDocumentChunk = typeof documentChunks.$inferInsert;
 export type WhatsappSession = typeof whatsappSessions.$inferSelect;
 export type NewWhatsappSession = typeof whatsappSessions.$inferInsert;
+export type Catalog = typeof catalogs.$inferSelect;
+export type NewCatalog = typeof catalogs.$inferInsert;
+export type CatalogItem = typeof catalogItems.$inferSelect;
+export type NewCatalogItem = typeof catalogItems.$inferInsert;

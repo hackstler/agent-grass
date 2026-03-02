@@ -1,4 +1,5 @@
 import type { Hono } from "hono";
+import type { ToolsInput } from "@mastra/core/agent";
 import type { Plugin } from "./plugin.interface.js";
 
 export class PluginRegistry {
@@ -24,8 +25,8 @@ export class PluginRegistry {
     return Array.from(this.plugins.values());
   }
 
-  getAllTools(): Record<string, unknown> {
-    const tools: Record<string, unknown> = {};
+  getAllTools(): ToolsInput {
+    const tools: ToolsInput = {};
     for (const plugin of this.plugins.values()) {
       Object.assign(tools, plugin.tools);
     }

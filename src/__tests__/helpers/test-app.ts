@@ -107,7 +107,7 @@ export function createTestApp(): TestContext {
     waManager: managers.wa,
     topicManager: managers.topic,
     orgManager: managers.org,
-    ragAgent: mockAgent as unknown as AppDependencies["ragAgent"],
+    coordinatorAgent: mockAgent as unknown as AppDependencies["coordinatorAgent"],
   });
 
   return { app, repos, managers, mockAgent };
