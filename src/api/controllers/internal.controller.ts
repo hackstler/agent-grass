@@ -26,6 +26,49 @@ const messageSchema = z.object({
   userId: z.string().uuid(),
 });
 
+export interface DocumentAttachment {
+  base64: string;
+  mimetype: string;
+  filename: string;
+}
+
+interface QuoteToolPayload {
+  toolName: string;
+  result?: {
+    success?: boolean;
+    pdfBase64?: string;
+    filename?: string;
+  };
+}
+
+/**
+ * Extracts a PDF attachment from the agent's tool result steps.
+ * Follows the same Mastra 1.5 pattern as extractSources().
+ */
+function extractPdfFromSteps(
+  steps: Array<{ toolResults?: Array<unknown> }>
+): DocumentAttachment | null {
+  const allToolResults = steps.flatMap((s) => s.toolResults ?? []);
+
+  const quoteResult = allToolResults.find((r) => {
+    const payload = (r as { payload?: QuoteToolPayload }).payload;
+    return payload?.toolName === "calculateBudget";
+  });
+
+  if (!quoteResult) return null;
+
+  const payload = (quoteResult as { payload: QuoteToolPayload }).payload;
+  const result = payload.result;
+
+  if (!result?.success || !result.pdfBase64 || !result.filename) return null;
+
+  return {
+    base64: result.pdfBase64,
+    mimetype: "application/pdf",
+    filename: result.filename,
+  };
+}
+
 export function createInternalController(
   waManager: WhatsAppManager,
   convManager: ConversationManager,
@@ -75,11 +118,19 @@ export function createInternalController(
         userId,
       );
 
-      const result = await agent.generate(messageBody, {
+      // Inject orgId as a hidden tag so the coordinator can pass it to tools.
+      // NOTE: Mastra stores this enriched message in its memory (no way to strip it
+      // before storage). The orgId leaks into conversation history — acceptable trade-off
+      // since memory is already scoped by resource:orgId. persistMessages below uses
+      // the clean messageBody for our own DB.
+      const enrichedBody = `${messageBody}\n[org:${orgId}]`;
+
+      const result = await agent.generate(enrichedBody, {
         memory: { thread: conversationId, resource: orgId },
       });
 
       const sources = extractSources(result.steps ?? []);
+      const pdfAttachment = extractPdfFromSteps(result.steps ?? []);
 
       await persistMessages(conversationId, messageBody, result.text, {
         model: ragConfig.llmModel,
@@ -87,10 +138,16 @@ export function createInternalController(
       });
 
       const waText = formatForWhatsApp(result.text) + buildSourcesFooter(sources);
-      return c.json({ data: { reply: waText } });
+
+      return c.json({
+        data: {
+          reply: waText,
+          ...(pdfAttachment && { document: pdfAttachment }),
+        },
+      });
     } catch (error) {
-      console.error("[internal/message] RAG agent error:", error);
-      return c.json({ error: "RAG agent unavailable" }, 503);
+      console.error("[internal/message] agent error:", error);
+      return c.json({ error: "Agent unavailable" }, 503);
     }
   });
 

@@ -9,7 +9,7 @@ if (!DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: DATABASE_URL,
   max: 10,
   idleTimeoutMillis: 30_000,
@@ -39,16 +39,11 @@ export async function ensurePgVector(): Promise<void> {
 }
 
 export async function runMigrations(): Promise<void> {
-  const { existsSync } = await import("fs");
-  const candidates = [
-    resolve(process.cwd(), "dist", "infrastructure", "db", "migrations"),
-    resolve(process.cwd(), "src", "infrastructure", "db", "migrations"),
-  ];
-  const migrationsFolder = candidates.find((p) => existsSync(resolve(p, "meta", "_journal.json")));
-  if (!migrationsFolder) {
-    console.warn("[migrations] no migrations folder found, skipping");
-    return;
-  }
-  console.log(`[migrations] using ${migrationsFolder}`);
+  const base = process.env["NODE_ENV"] === "production"
+    ? "dist/infrastructure/db/migrations"
+    : "src/infrastructure/db/migrations";
+  const migrationsFolder = resolve(process.cwd(), base);
+
   await migrate(db, { migrationsFolder });
 }
+

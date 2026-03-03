@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { UserManager } from "../../application/managers/user.manager.js";
 import type { OrganizationManager } from "../../application/managers/organization.manager.js";
+import type { AuthConfig } from "../../config/auth.config.js";
 import type { TokenPayload } from "../middleware/auth.js";
 
 const listUsersValidator = z.object({
@@ -16,6 +17,12 @@ const createUserValidator = z.object({
   role: z.enum(["admin", "user"]).default("user"),
 });
 
+const inviteUserValidator = z.object({
+  email: z.string().email().max(255),
+  orgId: z.string().min(1),
+  role: z.enum(["admin", "user"]).default("user"),
+});
+
 const createOrgValidator = z.object({
   orgId: z.string().min(1).max(100),
   adminUsername: z.string().min(3).max(50),
@@ -25,6 +32,7 @@ const createOrgValidator = z.object({
 export function createAdminController(
   userManager: UserManager,
   orgManager: OrganizationManager,
+  authConfig: AuthConfig,
 ): Hono {
   const router = new Hono();
 
@@ -41,6 +49,18 @@ export function createAdminController(
 
   router.post("/users", async (c) => {
     const body = await c.req.json().catch(() => null);
+
+    // Firebase strategy: invite by email (no password)
+    if (authConfig.strategy === "firebase") {
+      const parsed = inviteUserValidator.safeParse(body);
+      if (!parsed.success) {
+        return c.json({ error: "Bad Request", message: parsed.error.message }, 400);
+      }
+      const user = await userManager.invite(parsed.data);
+      return c.json(user, 201);
+    }
+
+    // Password strategy: create with username + password
     const parsed = createUserValidator.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: "Bad Request", message: parsed.error.message }, 400);

@@ -26,10 +26,14 @@ declare module "hono" {
 
 // ── JWT helpers ────────────────────────────────────────────────────────────────
 
-export function issueToken(payload: Omit<TokenPayload, keyof JwtPayload>): string {
+export function issueToken(
+  payload: Omit<TokenPayload, keyof JwtPayload>,
+  ttl: string = "7d",
+): string {
   const secret = process.env["JWT_SECRET"];
   if (!secret) throw new Error("JWT_SECRET env var is required to issue tokens");
-  return sign(payload, secret, { expiresIn: "7d" });
+  // Cast needed: jsonwebtoken expects StringValue from 'ms' package, not plain string
+  return sign(payload, secret, { expiresIn: ttl } as jwt.SignOptions);
 }
 
 export function verifyToken(token: string): TokenPayload {
