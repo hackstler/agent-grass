@@ -18,7 +18,6 @@ coverage/
 *.json
 !package.json
 !tsconfig.json
-!src/infrastructure/db/migrations/meta/_journal.json
 
 # OS
 .DS_Store
