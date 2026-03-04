@@ -41,7 +41,14 @@ Examples:
 const source = args[0]!;
 const isDir = args.includes("--dir");
 const orgIdIdx = args.indexOf("--org-id");
-const orgId = orgIdIdx !== -1 ? args[orgIdIdx + 1] : undefined;
+const orgIdRaw = orgIdIdx !== -1 ? args[orgIdIdx + 1] : undefined;
+
+if (!orgIdRaw) {
+  console.error("[ingest] Error: --org-id is required for multi-tenant ingestion.");
+  process.exit(1);
+}
+
+const orgId: string = orgIdRaw;
 
 async function main() {
   console.log(`[ingest] Source: ${source}`);

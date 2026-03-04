@@ -29,7 +29,7 @@ describe("UserManager", () => {
 
   describe("register", () => {
     it("first user becomes admin regardless of callerRole", async () => {
-      const user = fakeUser({ metadata: { passwordHash: hashPassword("pass"), role: "admin" } });
+      const user = fakeUser({ role: "admin", metadata: { passwordHash: hashPassword("pass") } });
       repo.count.mockResolvedValue(0);
       repo.findByEmail.mockResolvedValue(null);
       repo.create.mockResolvedValue(user);
@@ -41,7 +41,7 @@ describe("UserManager", () => {
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "alice",
-          metadata: expect.objectContaining({ role: "admin" }),
+          role: "admin",
         }),
       );
       expect(result.role).toBe("admin");
@@ -56,7 +56,7 @@ describe("UserManager", () => {
     });
 
     it("allows admin to register subsequent users", async () => {
-      const user = fakeUser({ email: "bob", metadata: { passwordHash: hashPassword("pass"), role: "user" } });
+      const user = fakeUser({ email: "bob", role: "user", metadata: { passwordHash: hashPassword("pass") } });
       repo.count.mockResolvedValue(1);
       repo.findByEmail.mockResolvedValue(null);
       repo.create.mockResolvedValue(user);
@@ -69,7 +69,7 @@ describe("UserManager", () => {
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "bob",
-          metadata: expect.objectContaining({ role: "user" }),
+          role: "user",
         }),
       );
       expect(result.role).toBe("user");
@@ -90,7 +90,8 @@ describe("UserManager", () => {
   describe("login", () => {
     it("returns user and role on valid credentials", async () => {
       const user = fakeUser({
-        metadata: { passwordHash: hashPassword("password"), role: "user" },
+        role: "user",
+        metadata: { passwordHash: hashPassword("password") },
       });
       repo.findByEmail.mockResolvedValue(user);
 
@@ -103,7 +104,8 @@ describe("UserManager", () => {
 
     it("throws UnauthorizedError on wrong password", async () => {
       const user = fakeUser({
-        metadata: { passwordHash: hashPassword("correct"), role: "user" },
+        role: "user",
+        metadata: { passwordHash: hashPassword("correct") },
       });
       repo.findByEmail.mockResolvedValue(user);
 
@@ -145,7 +147,8 @@ describe("UserManager", () => {
         id: "u-2",
         email: "bob",
         orgId: "org-2",
-        metadata: { passwordHash: hashPassword("pass"), role: "user" },
+        role: "user",
+        metadata: { passwordHash: hashPassword("pass") },
         createdAt: new Date("2025-06-01"),
       });
       repo.findByEmail.mockResolvedValue(null);
@@ -162,7 +165,7 @@ describe("UserManager", () => {
         expect.objectContaining({
           email: "bob",
           orgId: "org-2",
-          metadata: expect.objectContaining({ role: "user" }),
+          role: "user",
         }),
       );
       expect(result).toEqual({

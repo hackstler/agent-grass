@@ -6,7 +6,7 @@ import type { WhatsAppSessionRepository } from "../../domain/ports/repositories/
 import { NotFoundError, ConflictError, ValidationError } from "../../domain/errors/index.js";
 
 export interface OrgSummary {
-  orgId: string | null;
+  orgId: string;
   userCount: number;
   docCount: number;
   createdAt: string | null;
@@ -55,7 +55,8 @@ export class OrganizationManager {
     const admin = await this.userRepo.create({
       email: dto.adminUsername,
       orgId: dto.orgId,
-      metadata: { passwordHash: this.hashPassword(dto.adminPassword), role: "admin" },
+      role: "admin",
+      metadata: { passwordHash: this.hashPassword(dto.adminPassword) },
     });
 
     return {

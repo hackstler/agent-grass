@@ -67,7 +67,8 @@ describe("OrganizationManager", () => {
         id: "u-new",
         email: "admin@new.com",
         orgId: "org-new",
-        metadata: { passwordHash: "hashed", role: "admin" },
+        role: "admin",
+        metadata: { passwordHash: "hashed" },
         createdAt: new Date("2025-06-01"),
       });
       userRepo.create.mockResolvedValue(createdUser);

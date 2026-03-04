@@ -35,10 +35,11 @@ export function createChatRoutes(agent: Agent): Hono {
 
     const { query } = parsed.data;
     const orgId = c.get("user")?.orgId;
+    if (!orgId) return c.json({ error: "Unauthorized", message: "Missing orgId" }, 401);
     const conversationId = await resolveConversationId(parsed.data.conversationId);
 
     const result = await agent.generate(query, {
-      memory: { thread: conversationId, resource: orgId ?? "anonymous" },
+      memory: { thread: conversationId, resource: orgId },
     });
 
     const sources = extractSources(result.steps ?? []);
@@ -68,6 +69,8 @@ export function createChatRoutes(agent: Agent): Hono {
     const conversationIdParam = c.req.query("conversationId");
     const orgId = c.get("user")?.orgId;
 
+    if (!orgId) return c.json({ error: "Unauthorized", message: "Missing orgId" }, 401);
+
     if (!queryParam?.trim()) {
       return c.json({ error: "Missing 'query' query parameter" }, 400);
     }
@@ -95,7 +98,7 @@ export function createChatRoutes(agent: Agent): Hono {
 
       try {
         const agentStream = await agent.stream(parsed.data.query, {
-          memory: { thread: conversationId, resource: orgId ?? "anonymous" },
+          memory: { thread: conversationId, resource: orgId },
         });
 
         for await (const chunk of agentStream.fullStream) {

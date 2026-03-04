@@ -32,7 +32,6 @@ For a list of URLs, pass ALL of them in the 'items' array in a single call — d
         .describe("One or more URLs to ingest OR plain-text notes to save"),
       orgId: z
         .string()
-        .optional()
         .describe("Organisation / project scope for multi-tenancy"),
     }),
     outputSchema: z.object({

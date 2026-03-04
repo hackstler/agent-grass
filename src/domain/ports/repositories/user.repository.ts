@@ -1,7 +1,7 @@
 import type { User, NewUser } from "../../entities/index.js";
 
 export interface OrgUserCount {
-  orgId: string | null;
+  orgId: string;
   userCount: number;
   earliestCreatedAt: Date | null;
 }

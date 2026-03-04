@@ -54,7 +54,8 @@ async function seed() {
     .values({
       email: "dev@example.com",
       orgId: "default",
-      metadata: { name: "Dev User", role: "admin" },
+      role: "admin",
+      metadata: { name: "Dev User" },
     })
     .onConflictDoNothing()
     .returning({ id: users.id });

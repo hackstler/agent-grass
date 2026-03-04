@@ -30,7 +30,7 @@ Returns the most relevant text passages ranked by relevance score.`,
     inputSchema: z.object({
       query: z.string().describe("The search query — can be the user's question or a reformulated version"),
       topK: z.number().optional().describe("Max results to return, defaults to config value"),
-      orgId: z.string().optional(),
+      orgId: z.string(),
       documentIds: z.array(z.string()).optional(),
       topicId: z.string().optional().describe("Filter by topic ID to narrow results"),
     }),
@@ -45,7 +45,7 @@ Returns the most relevant text passages ranked by relevance score.`,
         {
           topK,
           queryText: query,
-          ...(orgId ? { orgId } : {}),
+          orgId,
           ...(documentIds?.length ? { documentIds } : {}),
           ...(topicId ? { topicId } : {}),
         }

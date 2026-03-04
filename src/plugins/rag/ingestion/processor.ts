@@ -24,7 +24,7 @@ export interface ProcessResult {
  */
 export async function processDocument(
   loaded: LoadedDocument,
-  orgId?: string,
+  orgId: string,
   topicId?: string
 ): Promise<ProcessResult> {
   const source = loaded.metadata.source;
@@ -44,27 +44,25 @@ export async function processDocument(
   let enrichedMetadata = loaded.metadata as Record<string, unknown>;
   let resolvedTopicId = topicId ?? null;
 
-  if (orgId) {
-    try {
-      console.log(`[processor] Enriching: ${source}`);
-      const enrichment = await enrichDocument(loaded.content, enrichedMetadata);
+  try {
+    console.log(`[processor] Enriching: ${source}`);
+    const enrichment = await enrichDocument(loaded.content, enrichedMetadata);
 
-      enrichedMetadata = {
-        ...enrichedMetadata,
-        summary: enrichment.summary,
-        keywords: enrichment.keywords,
-        entities: enrichment.entities,
-        detectedLanguage: enrichment.language,
-      };
+    enrichedMetadata = {
+      ...enrichedMetadata,
+      summary: enrichment.summary,
+      keywords: enrichment.keywords,
+      entities: enrichment.entities,
+      detectedLanguage: enrichment.language,
+    };
 
-      // 3. Resolve topic (auto-create if needed)
-      if (!topicId && enrichment.suggestedTopic) {
-        resolvedTopicId = await resolveTopic(orgId, enrichment.suggestedTopic);
-        console.log(`[processor] Topic: "${enrichment.suggestedTopic}" → ${resolvedTopicId}`);
-      }
-    } catch (err) {
-      console.warn(`[processor] Enrichment failed, continuing without: ${err instanceof Error ? err.message : String(err)}`);
+    // 3. Resolve topic (auto-create if needed)
+    if (!topicId && enrichment.suggestedTopic) {
+      resolvedTopicId = await resolveTopic(orgId, enrichment.suggestedTopic);
+      console.log(`[processor] Topic: "${enrichment.suggestedTopic}" → ${resolvedTopicId}`);
     }
+  } catch (err) {
+    console.warn(`[processor] Enrichment failed, continuing without: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // 4. Create document record

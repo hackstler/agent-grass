@@ -10,7 +10,7 @@ const SUPPORTED_EXTENSIONS = new Set([".pdf", ".md", ".mdx", ".html", ".htm", ".
  * Watch a directory for new files and auto-ingest them.
  * Useful for document drop-box workflows.
  */
-export function watchDirectory(dirPath: string, orgId?: string): () => void {
+export function watchDirectory(dirPath: string, orgId: string): () => void {
   console.log(`[watcher] Watching ${dirPath} for new documents...`);
 
   const watcher = watch(dirPath, { recursive: false }, async (event, filename) => {
@@ -49,7 +49,7 @@ export function watchDirectory(dirPath: string, orgId?: string): () => void {
 /**
  * Ingest all existing files in a directory (one-time scan).
  */
-export async function ingestDirectory(dirPath: string, orgId?: string): Promise<void> {
+export async function ingestDirectory(dirPath: string, orgId: string): Promise<void> {
   const entries = await readdir(dirPath);
   const files = entries.filter((f) => SUPPORTED_EXTENSIONS.has(extname(f).toLowerCase()));
 

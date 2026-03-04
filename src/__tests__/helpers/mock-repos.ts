@@ -88,7 +88,8 @@ export function fakeUser(overrides: Partial<User> = {}): User {
     id: "u-1",
     email: "alice",
     orgId: "org-1",
-    metadata: { passwordHash: "hash", role: "user" },
+    role: "user",
+    metadata: { passwordHash: "hash" },
     createdAt: new Date("2025-01-01"),
     ...overrides,
   };

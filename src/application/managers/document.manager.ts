@@ -5,8 +5,7 @@ import { NotFoundError } from "../../domain/errors/index.js";
 export class DocumentManager {
   constructor(private readonly repo: DocumentRepository) {}
 
-  async list(orgId: string | undefined, filters?: ListDocumentsFilters): Promise<Document[]> {
-    if (!orgId) return [];
+  async list(orgId: string, filters?: ListDocumentsFilters): Promise<Document[]> {
     return this.repo.findByOrg(orgId, filters);
   }
 

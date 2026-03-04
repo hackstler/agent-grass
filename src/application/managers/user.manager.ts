@@ -32,7 +32,7 @@ export interface InviteUserDto {
 export interface UserListItem {
   id: string;
   email: string | null;
-  orgId: string | null;
+  orgId: string;
   role: string;
   createdAt: string;
 }
@@ -65,7 +65,8 @@ export class UserManager {
     const user = await this.repo.create({
       email: dto.username,
       orgId: dto.orgId ?? dto.username,
-      metadata: { passwordHash: this.hashPassword(dto.password), role },
+      role,
+      metadata: { passwordHash: this.hashPassword(dto.password) },
     });
 
     return { user, role };
@@ -78,12 +79,12 @@ export class UserManager {
     const user = await this.repo.findByEmail(username);
     if (!user) throw new UnauthorizedError("Invalid credentials");
 
-    const meta = user.metadata as { passwordHash?: string; role?: string } | null;
+    const meta = user.metadata as { passwordHash?: string } | null;
     if (!meta?.passwordHash || meta.passwordHash !== this.hashPassword(password)) {
       throw new UnauthorizedError("Invalid credentials");
     }
 
-    return { user, role: (meta.role ?? "user") as "admin" | "user" };
+    return { user, role: user.role };
   }
 
   async getById(id: string): Promise<User> {
@@ -98,7 +99,7 @@ export class UserManager {
       id: u.id,
       email: u.email,
       orgId: u.orgId,
-      role: ((u.metadata as Record<string, unknown> | null)?.["role"] as string) ?? "user",
+      role: u.role,
       createdAt: u.createdAt.toISOString(),
     }));
   }
@@ -111,7 +112,8 @@ export class UserManager {
     const user = await this.repo.create({
       email: dto.username,
       orgId: dto.orgId,
-      metadata: { passwordHash: this.hashPassword(dto.password), role },
+      role,
+      metadata: { passwordHash: this.hashPassword(dto.password) },
     });
 
     return {
@@ -136,8 +138,7 @@ export class UserManager {
   ): Promise<{ user: User; role: "admin" | "user" } | null> {
     const user = await this.repo.findByEmail(email);
     if (!user) return null;
-    const meta = user.metadata as { role?: string } | null;
-    return { user, role: (meta?.role ?? "user") as "admin" | "user" };
+    return { user, role: user.role };
   }
 
   async invite(dto: InviteUserDto): Promise<UserListItem> {
@@ -148,7 +149,8 @@ export class UserManager {
     const user = await this.repo.create({
       email: dto.email,
       orgId: dto.orgId,
-      metadata: { role, authStrategy: "firebase" },
+      role,
+      metadata: { authStrategy: "firebase" },
     });
 
     return {
@@ -162,7 +164,7 @@ export class UserManager {
 
   async resolveOrgId(userId: string): Promise<string> {
     const user = await this.repo.findById(userId);
-    if (!user?.orgId) throw new NotFoundError("User", userId);
+    if (!user) throw new NotFoundError("User", userId);
     return user.orgId;
   }
 

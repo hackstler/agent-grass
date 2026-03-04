@@ -93,7 +93,8 @@ describe("Auth API", () => {
         id: "u-1",
         email: "alice",
         orgId: "org-1",
-        metadata: { passwordHash, role: "user" },
+        role: "user",
+        metadata: { passwordHash },
       });
       ctx.repos.user.findByEmail.mockResolvedValue(user);
 

@@ -36,12 +36,6 @@ describe("DocumentManager", () => {
       expect(result).toEqual(docs);
     });
 
-    it("returns empty array when orgId is undefined without calling repo", async () => {
-      const result = await manager.list(undefined);
-
-      expect(repo.findByOrg).not.toHaveBeenCalled();
-      expect(result).toEqual([]);
-    });
   });
 
   // ── delete ──────────────────────────────────────────────────────────────────

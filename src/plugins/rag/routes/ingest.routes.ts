@@ -80,6 +80,8 @@ async function handleFileUpload(c: Context) {
   const user = c.get("user");
   const orgId = user?.orgId;
 
+  if (!orgId) return c.json({ error: "Unauthorized", message: "Missing orgId" }, 401);
+
   if (!(file instanceof File)) {
     return c.json({ error: "Missing 'file' field in form data" }, 400);
   }
@@ -126,6 +128,9 @@ async function handleUrlIngest(c: Context) {
   const { url, title, topicId } = parsed.data;
   const user = c.get("user");
   const orgId = user?.orgId;
+
+  if (!orgId) return c.json({ error: "Unauthorized", message: "Missing orgId" }, 401);
+
   const loaded = await loadDocument(url);
 
   if (title) {

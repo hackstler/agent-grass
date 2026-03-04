@@ -11,7 +11,8 @@
 export interface User {
   id: string;
   email: string | null;
-  orgId: string | null;
+  orgId: string;
+  role: "admin" | "user";
   metadata: Record<string, unknown> | null;
   createdAt: Date;
 }
@@ -19,7 +20,8 @@ export interface User {
 export interface NewUser {
   id?: string | undefined;
   email?: string | null | undefined;
-  orgId?: string | null | undefined;
+  orgId: string;
+  role?: "admin" | "user" | undefined;
   metadata?: Record<string, unknown> | null | undefined;
   createdAt?: Date | undefined;
 }
@@ -107,7 +109,7 @@ export interface DocumentMetadata {
 
 export interface Document {
   id: string;
-  orgId: string | null;
+  orgId: string;
   topicId: string | null;
   title: string;
   source: string;
@@ -121,7 +123,7 @@ export interface Document {
 
 export interface NewDocument {
   id?: string | undefined;
-  orgId?: string | null | undefined;
+  orgId: string;
   topicId?: string | null | undefined;
   title: string;
   source: string;

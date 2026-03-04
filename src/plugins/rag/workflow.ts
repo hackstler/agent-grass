@@ -22,7 +22,7 @@ const chunkSchema = z.object({
 
 const inputSchema = z.object({
   query: z.string(),
-  orgId: z.string().optional(),
+  orgId: z.string(),
   documentIds: z.array(z.string()).optional(),
 });
 
@@ -31,7 +31,7 @@ const retrievalOutputSchema = z.object({
   chunks: z.array(chunkSchema),
   chunkCount: z.number(),
   expanded: z.boolean(),
-  orgId: z.string().optional(),
+  orgId: z.string(),
   documentIds: z.array(z.string()).optional(),
 });
 
@@ -50,7 +50,7 @@ export function createRagRetrievalWorkflow(
       const { query, orgId, documentIds } = inputData;
       const result = await runRetrievalPipeline(query, deps, {
         topK: ragConfig.topK,
-        ...(orgId ? { orgId } : {}),
+        orgId,
         ...(documentIds?.length ? { documentIds } : {}),
       });
       return {
