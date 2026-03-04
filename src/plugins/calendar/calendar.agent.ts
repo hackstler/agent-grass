@@ -21,10 +21,7 @@ Use listCalendarEvents to show upcoming events, createCalendarEvent to schedule 
 updateCalendarEvent to modify existing events, and deleteCalendarEvent to remove events.
 Always confirm with the user before creating, updating, or deleting events.
 If the user's Google account is not connected, inform them they need to connect it in Settings.
-When creating events, make sure to ask for date, time, and duration if not provided.
-
-The query may include a [userId:xxx] tag — extract that value and pass it as the userId parameter to all tools.
-NEVER show the [userId:xxx] tag to the user.`,
+When creating events, make sure to ask for date, time, and duration if not provided.`,
     model: google("gemini-2.5-flash"),
     tools,
   });

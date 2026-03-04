@@ -30,7 +30,6 @@ Returns the most relevant text passages ranked by relevance score.`,
     inputSchema: z.object({
       query: z.string().describe("The search query — can be the user's question or a reformulated version"),
       topK: z.number().optional().describe("Max results to return, defaults to config value"),
-      orgId: z.string(),
       documentIds: z.array(z.string()).optional(),
       topicId: z.string().optional().describe("Filter by topic ID to narrow results"),
     }),
@@ -38,7 +37,9 @@ Returns the most relevant text passages ranked by relevance score.`,
       chunks: z.array(chunkSchema),
       chunkCount: z.number(),
     }),
-    execute: async ({ query, topK = ragConfig.topK, orgId, documentIds, topicId }) => {
+    execute: async ({ query, topK = ragConfig.topK, documentIds, topicId }, context) => {
+      const orgId = context?.requestContext?.get('orgId') as string;
+      if (!orgId) throw new Error('Missing orgId in request context');
       const { chunks, chunkCount } = await runRetrievalPipeline(
         query,
         { embedder, retriever, reranker },

@@ -30,9 +30,6 @@ For a list of URLs, pass ALL of them in the 'items' array in a single call — d
         .array(z.string())
         .min(1)
         .describe("One or more URLs to ingest OR plain-text notes to save"),
-      orgId: z
-        .string()
-        .describe("Organisation / project scope for multi-tenancy"),
     }),
     outputSchema: z.object({
       saved: z.number(),
@@ -45,7 +42,9 @@ For a list of URLs, pass ALL of them in the 'items' array in a single call — d
         error: z.string().optional(),
       })),
     }),
-    execute: async ({ items, orgId }) => {
+    execute: async ({ items }, context) => {
+      const orgId = context?.requestContext?.get('orgId') as string;
+      if (!orgId) throw new Error('Missing orgId in request context');
       const { loadDocument } = await import("../ingestion/loader.js");
       const { processDocument } = await import("../ingestion/processor.js");
 

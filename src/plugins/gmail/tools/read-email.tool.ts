@@ -12,9 +12,6 @@ export function createReadEmailTool({ gmailService }: ReadEmailDeps) {
     description:
       "Read the full content of a specific email by its message ID. Returns subject, sender, recipient, date, body text, and labels.",
     inputSchema: z.object({
-      userId: z
-        .string()
-        .describe("User ID to retrieve the email for (from system context)"),
       messageId: z
         .string()
         .describe("The Gmail message ID to read"),
@@ -29,7 +26,9 @@ export function createReadEmailTool({ gmailService }: ReadEmailDeps) {
       body: z.string(),
       labelIds: z.array(z.string()),
     }),
-    execute: async ({ userId, messageId }) => {
+    execute: async ({ messageId }, context) => {
+      const userId = context?.requestContext?.get('userId') as string;
+      if (!userId) throw new Error('Missing userId in request context');
       return gmailService.readEmail(userId, messageId);
     },
   });

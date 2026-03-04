@@ -3,6 +3,7 @@ import { stream } from "hono/streaming";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import type { Agent } from "@mastra/core/agent";
+import { RequestContext } from "@mastra/core/request-context";
 import { ragConfig } from "../config/rag.config.js";
 import { db } from "../../../infrastructure/db/client.js";
 import { conversations } from "../../../infrastructure/db/schema.js";
@@ -36,9 +37,13 @@ export function createChatRoutes(agent: Agent): Hono {
     const { query } = parsed.data;
     const orgId = c.get("user")?.orgId;
     if (!orgId) return c.json({ error: "Unauthorized", message: "Missing orgId" }, 401);
+    const userId = c.get("user")?.userId;
     const conversationId = await resolveConversationId(parsed.data.conversationId);
 
+    const requestContext = new RequestContext([['userId', userId ?? 'anonymous'], ['orgId', orgId]]);
+
     const result = await agent.generate(query, {
+      requestContext,
       memory: { thread: conversationId, resource: orgId },
     });
 
@@ -98,7 +103,10 @@ export function createChatRoutes(agent: Agent): Hono {
       const collectedSources: Array<{ id: string; documentTitle: string; documentSource: string; score: number; excerpt: string }> = [];
 
       try {
+        const requestContext = new RequestContext([['userId', userId ?? 'anonymous'], ['orgId', orgId]]);
+
         const agentStream = await agent.stream(parsed.data.query, {
+          requestContext,
           memory: { thread: conversationId, resource: orgId },
         });
 

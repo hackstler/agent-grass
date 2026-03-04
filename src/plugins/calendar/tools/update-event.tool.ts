@@ -13,7 +13,6 @@ export function createUpdateEventTool({ calendarService }: UpdateEventDeps) {
       "Update an existing event in the user's Google Calendar. Only the provided fields will be modified.",
 
     inputSchema: z.object({
-      userId: z.string().describe("User ID that owns the event (from system context)"),
       eventId: z.string().describe("ID of the calendar event to update"),
       summary: z.string().optional().describe("New title for the event"),
       start: z.string().optional().describe("New start date/time in ISO 8601 format"),
@@ -29,7 +28,9 @@ export function createUpdateEventTool({ calendarService }: UpdateEventDeps) {
       eventId: z.string(),
     }),
 
-    execute: async ({ userId, eventId, summary, start, end, description, location, attendees, timeZone }) => {
+    execute: async ({ eventId, summary, start, end, description, location, attendees, timeZone }, context) => {
+      const userId = context?.requestContext?.get('userId') as string;
+      if (!userId) throw new Error('Missing userId in request context');
       const updates: Record<string, unknown> = {};
       if (summary !== undefined) updates["summary"] = summary;
       if (start !== undefined) updates["start"] = start;

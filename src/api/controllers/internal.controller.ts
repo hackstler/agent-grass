@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Agent } from "@mastra/core/agent";
+import { RequestContext } from "@mastra/core/request-context";
 import type { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
 import type { ConversationManager } from "../../application/managers/conversation.manager.js";
 import { extractSources } from "../helpers/extract-sources.js";
@@ -155,14 +156,10 @@ export function createInternalController(
         userId,
       );
 
-      // Inject orgId as a hidden tag so the coordinator can pass it to tools.
-      // NOTE: Mastra stores this enriched message in its memory (no way to strip it
-      // before storage). The orgId leaks into conversation history — acceptable trade-off
-      // since memory is already scoped by resource:orgId. persistMessages below uses
-      // the clean messageBody for our own DB.
-      const enrichedBody = `${messageBody}\n[org:${orgId}][userId:${userId}]`;
+      const requestContext = new RequestContext([['userId', userId], ['orgId', orgId]]);
 
-      const result = await agent.generate(enrichedBody, {
+      const result = await agent.generate(messageBody, {
+        requestContext,
         memory: { thread: conversationId, resource: orgId },
       });
 

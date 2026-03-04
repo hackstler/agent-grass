@@ -25,10 +25,7 @@ SENDING EMAILS:
 - When the query contains "CONFIRMED" or explicitly says to send immediately, execute sendEmail right away WITHOUT asking again.
 - NEVER ask for confirmation more than once for the same email.
 
-If the user's Google account is not connected, inform them they need to connect it in Settings.
-
-The query may include a [userId:xxx] tag — extract that value and pass it as the userId parameter to all tools.
-NEVER show the [userId:xxx] tag to the user.`,
+If the user's Google account is not connected, inform them they need to connect it in Settings.`,
     model: google("gemini-2.5-flash"),
     tools,
   });

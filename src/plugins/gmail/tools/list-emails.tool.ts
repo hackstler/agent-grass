@@ -12,9 +12,6 @@ export function createListEmailsTool({ gmailService }: ListEmailsDeps) {
     description:
       "List recent emails from the user's Gmail inbox. Requires the user's Google account to be connected.",
     inputSchema: z.object({
-      userId: z
-        .string()
-        .describe("User ID to retrieve emails for (from system context)"),
       maxResults: z
         .number()
         .min(1)
@@ -34,7 +31,9 @@ export function createListEmailsTool({ gmailService }: ListEmailsDeps) {
       ),
       totalResults: z.number(),
     }),
-    execute: async ({ userId, maxResults }) => {
+    execute: async ({ maxResults }, context) => {
+      const userId = context?.requestContext?.get('userId') as string;
+      if (!userId) throw new Error('Missing userId in request context');
       const result = await gmailService.listEmails(userId, maxResults ?? 10);
       return {
         emails: result.map((e) => ({

@@ -13,7 +13,6 @@ export function createCreateEventTool({ calendarService }: CreateEventDeps) {
       "Create a new event in the user's Google Calendar. Requires the user's Google account to be connected.",
 
     inputSchema: z.object({
-      userId: z.string().describe("User ID to create the event for (from system context)"),
       summary: z.string().describe("Title of the event"),
       start: z.string().describe("Start date/time in ISO 8601 format (e.g. 2025-03-15T10:00:00+01:00)"),
       end: z.string().describe("End date/time in ISO 8601 format (e.g. 2025-03-15T11:00:00+01:00)"),
@@ -29,7 +28,9 @@ export function createCreateEventTool({ calendarService }: CreateEventDeps) {
       htmlLink: z.string(),
     }),
 
-    execute: async ({ userId, summary, start, end, description, location, attendees, timeZone }) => {
+    execute: async ({ summary, start, end, description, location, attendees, timeZone }, context) => {
+      const userId = context?.requestContext?.get('userId') as string;
+      if (!userId) throw new Error('Missing userId in request context');
       return calendarService.createEvent(userId, {
         summary,
         start,

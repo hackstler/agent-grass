@@ -13,7 +13,6 @@ export function createDeleteEventTool({ calendarService }: DeleteEventDeps) {
       "Delete an event from the user's Google Calendar. This action is irreversible.",
 
     inputSchema: z.object({
-      userId: z.string().describe("User ID that owns the event (from system context)"),
       eventId: z.string().describe("ID of the calendar event to delete"),
     }),
 
@@ -22,7 +21,9 @@ export function createDeleteEventTool({ calendarService }: DeleteEventDeps) {
       deletedEventId: z.string(),
     }),
 
-    execute: async ({ userId, eventId }) => {
+    execute: async ({ eventId }, context) => {
+      const userId = context?.requestContext?.get('userId') as string;
+      if (!userId) throw new Error('Missing userId in request context');
       const result = await calendarService.deleteEvent(userId, eventId);
       return result;
     },

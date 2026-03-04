@@ -13,19 +13,14 @@ function createDelegationTool(plugin: Plugin) {
     description: `Delegate to ${plugin.name}: ${plugin.description}`,
     inputSchema: z.object({
       query: z.string().describe("The user query or instruction to delegate"),
-      orgId: z.string().optional().describe("Organization ID for multi-tenant context"),
-      userId: z.string().optional().describe("User ID for per-user services like Gmail and Calendar"),
     }),
-    execute: async ({ query, orgId, userId }) => {
-      const tags = [
-        orgId ? `[org:${orgId}]` : "",
-        userId ? `[userId:${userId}]` : "",
-      ].filter(Boolean).join("");
-      const enriched = tags ? `${query}\n${tags}` : query;
-
+    execute: async ({ query }, context) => {
       try {
         // Generate WITHOUT memory — the coordinator already manages conversation memory.
-        const result = await plugin.agent.generate(enriched);
+        // Forward requestContext so sub-agent tools can read userId/orgId.
+        const result = await plugin.agent.generate(query, {
+          ...(context?.requestContext && { requestContext: context.requestContext }),
+        });
 
         if (!result.text?.trim()) {
           console.error(`[delegation] ${plugin.id} returned empty response`, {

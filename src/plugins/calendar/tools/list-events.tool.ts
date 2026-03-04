@@ -13,7 +13,6 @@ export function createListEventsTool({ calendarService }: ListEventsDeps) {
       "List upcoming events from the user's Google Calendar. Requires the user's Google account to be connected.",
 
     inputSchema: z.object({
-      userId: z.string().describe("User ID to retrieve events for (from system context)"),
       timeMin: z
         .string()
         .optional()
@@ -41,7 +40,9 @@ export function createListEventsTool({ calendarService }: ListEventsDeps) {
       totalResults: z.number(),
     }),
 
-    execute: async ({ userId, timeMin, timeMax, maxResults }) => {
+    execute: async ({ timeMin, timeMax, maxResults }, context) => {
+      const userId = context?.requestContext?.get('userId') as string;
+      if (!userId) throw new Error('Missing userId in request context');
       const events = await calendarService.listEvents(userId, timeMin, timeMax, maxResults ?? 10);
       return {
         events: events.map((e) => ({

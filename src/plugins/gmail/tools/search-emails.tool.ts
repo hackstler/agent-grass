@@ -12,9 +12,6 @@ export function createSearchEmailsTool({ gmailService }: SearchEmailsDeps) {
     description:
       "Search the user's Gmail using a Gmail search query (same syntax as the Gmail search bar). Requires the user's Google account to be connected.",
     inputSchema: z.object({
-      userId: z
-        .string()
-        .describe("User ID to search emails for (from system context)"),
       query: z
         .string()
         .min(1)
@@ -38,7 +35,9 @@ export function createSearchEmailsTool({ gmailService }: SearchEmailsDeps) {
       ),
       totalResults: z.number(),
     }),
-    execute: async ({ userId, query, maxResults }) => {
+    execute: async ({ query, maxResults }, context) => {
+      const userId = context?.requestContext?.get('userId') as string;
+      if (!userId) throw new Error('Missing userId in request context');
       const result = await gmailService.searchEmails(userId, query, maxResults ?? 10);
       return {
         emails: result.map((e) => ({
