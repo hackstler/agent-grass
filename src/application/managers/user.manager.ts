@@ -23,6 +23,12 @@ export interface CreateUserDto {
   role?: "admin" | "user";
 }
 
+export interface InviteUserDto {
+  email: string;
+  orgId: string;
+  role?: "admin" | "user";
+}
+
 export interface UserListItem {
   id: string;
   email: string | null;
@@ -123,6 +129,35 @@ export class UserManager {
     }
     const deleted = await this.repo.delete(id);
     if (!deleted) throw new NotFoundError("User", id);
+  }
+
+  async findByEmailWithRole(
+    email: string,
+  ): Promise<{ user: User; role: "admin" | "user" } | null> {
+    const user = await this.repo.findByEmail(email);
+    if (!user) return null;
+    const meta = user.metadata as { role?: string } | null;
+    return { user, role: (meta?.role ?? "user") as "admin" | "user" };
+  }
+
+  async invite(dto: InviteUserDto): Promise<UserListItem> {
+    const existing = await this.repo.findByEmail(dto.email);
+    if (existing) throw new ConflictError("User", `email '${dto.email}'`);
+
+    const role = dto.role ?? "user";
+    const user = await this.repo.create({
+      email: dto.email,
+      orgId: dto.orgId,
+      metadata: { role, authStrategy: "firebase" },
+    });
+
+    return {
+      id: user.id,
+      email: user.email,
+      orgId: user.orgId,
+      role,
+      createdAt: user.createdAt.toISOString(),
+    };
   }
 
   async resolveOrgId(userId: string): Promise<string> {

@@ -37,7 +37,7 @@ export class ConversationManager {
 
   /** Resolve or create a conversation for a WhatsApp chatId. */
   async resolveOrCreateByTitle(title: string, userId: string): Promise<string> {
-    const existing = await this.repo.findByTitle(title);
+    const existing = await this.repo.findByTitle(title, userId);
     if (existing) return existing.id;
 
     const conv = await this.repo.create({ title, userId });

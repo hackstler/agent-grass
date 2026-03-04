@@ -1,4 +1,4 @@
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { conversations, messages } from "../db/schema.js";
 import type { Conversation, NewConversation } from "../db/schema.js";
@@ -52,9 +52,9 @@ export class DrizzleConversationRepository implements ConversationRepository {
     });
   }
 
-  async findByTitle(title: string): Promise<Pick<Conversation, "id"> | null> {
+  async findByTitle(title: string, userId: string): Promise<Pick<Conversation, "id"> | null> {
     const result = await db.query.conversations.findFirst({
-      where: eq(conversations.title, title),
+      where: and(eq(conversations.title, title), eq(conversations.userId, userId)),
       columns: { id: true },
     });
     return result ?? null;

@@ -6,6 +6,7 @@
  * - 1 usuario de prueba
  * - 1 conversación con mensajes de ejemplo
  * - 1 documento de muestra con chunks embedidos
+ * - Catálogo de productos de césped artificial (si no existe)
  */
 import "dotenv/config";
 import { db, ensurePgVector } from "./client.js";

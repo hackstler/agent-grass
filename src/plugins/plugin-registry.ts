@@ -1,4 +1,5 @@
 import type { Hono } from "hono";
+import type { ToolsInput } from "@mastra/core/agent";
 import type { Plugin } from "./plugin.interface.js";
 
 export class PluginRegistry {
@@ -24,8 +25,8 @@ export class PluginRegistry {
     return Array.from(this.plugins.values());
   }
 
-  getAllTools(): Record<string, unknown> {
-    const tools: Record<string, unknown> = {};
+  getAllTools(): ToolsInput {
+    const tools: ToolsInput = {};
     for (const plugin of this.plugins.values()) {
       Object.assign(tools, plugin.tools);
     }
@@ -40,6 +41,15 @@ export class PluginRegistry {
         // The plugin's routes() returns a Hono instance with its own paths
         app.route("/", router);
         console.log(`[plugins] mounted routes for: ${plugin.id}`);
+      }
+    }
+  }
+
+  async ensureTablesForAll(): Promise<void> {
+    for (const plugin of this.plugins.values()) {
+      if (plugin.ensureTables) {
+        await plugin.ensureTables();
+        console.log(`[plugins] tables ready: ${plugin.id}`);
       }
     }
   }

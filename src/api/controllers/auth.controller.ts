@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { UserManager } from "../../application/managers/user.manager.js";
+import type { AuthConfig } from "../../config/auth.config.js";
+import type { AuthStrategy } from "../../domain/ports/auth-strategy.js";
 import { issueToken, type TokenPayload } from "../middleware/auth.js";
 
 const registerValidator = z.object({
@@ -10,19 +12,35 @@ const registerValidator = z.object({
   role: z.enum(["admin", "user"]).default("user"),
 });
 
-const loginValidator = z.object({
+const passwordLoginValidator = z.object({
   username: z.string(),
   password: z.string(),
 });
 
-export function createAuthController(manager: UserManager): Hono {
+const firebaseLoginValidator = z.object({
+  idToken: z.string().min(1),
+});
+
+export function createAuthController(
+  manager: UserManager,
+  authConfig: AuthConfig,
+  strategy: AuthStrategy | null,
+): Hono {
   const router = new Hono();
 
   /**
    * POST /auth/register
    * Creates a new user. First user is auto-admin; subsequent users require admin.
+   * Disabled when AUTH_STRATEGY=firebase (users are managed via Firebase + invite).
    */
   router.post("/register", async (c) => {
+    if (authConfig.strategy === "firebase") {
+      return c.json(
+        { error: "Forbidden", message: "Registration is handled via Firebase" },
+        403,
+      );
+    }
+
     const body = await c.req.json().catch(() => null);
     const parsed = registerValidator.safeParse(body);
     if (!parsed.success) {
@@ -35,12 +53,10 @@ export function createAuthController(manager: UserManager): Hono {
     if (parsed.data.orgId) dto.orgId = parsed.data.orgId;
     const { user, role } = await manager.register(dto, caller?.role);
 
-    const token = issueToken({
-      userId: user.id,
-      username: user.email!,
-      orgId: user.orgId!,
-      role,
-    });
+    const token = issueToken(
+      { userId: user.id, username: user.email!, orgId: user.orgId!, role },
+      authConfig.jwtTtl,
+    );
 
     return c.json(
       { token, user: { id: user.id, username: user.email!, orgId: user.orgId!, role } },
@@ -50,23 +66,54 @@ export function createAuthController(manager: UserManager): Hono {
 
   /**
    * POST /auth/login
-   * Body: { username, password } → returns JWT
+   * - password strategy: { username, password } → JWT
+   * - firebase strategy: { idToken } → verify Firebase token → JWT
    */
   router.post("/login", async (c) => {
     const body = await c.req.json().catch(() => null);
-    const parsed = loginValidator.safeParse(body);
+
+    // Firebase strategy: verify ID token, find user by email, issue local JWT
+    if (authConfig.strategy === "firebase" && strategy) {
+      const parsed = firebaseLoginValidator.safeParse(body);
+      if (!parsed.success) {
+        return c.json(
+          { error: "Validation", message: "Body must contain { idToken: string }" },
+          400,
+        );
+      }
+
+      const authResult = await strategy.verifyToken(parsed.data.idToken);
+      const found = await manager.findByEmailWithRole(authResult.email);
+      if (!found) {
+        return c.json(
+          { error: "Unauthorized", message: "No account found for this email. Contact your admin." },
+          401,
+        );
+      }
+
+      const { user, role } = found;
+      const token = issueToken(
+        { userId: user.id, username: user.email!, orgId: user.orgId!, role },
+        authConfig.jwtTtl,
+      );
+
+      return c.json({
+        token,
+        user: { id: user.id, username: user.email!, orgId: user.orgId!, role },
+      });
+    }
+
+    // Password strategy: existing flow
+    const parsed = passwordLoginValidator.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: "Bad Request" }, 400);
     }
 
     const { user, role } = await manager.login(parsed.data.username, parsed.data.password);
-
-    const token = issueToken({
-      userId: user.id,
-      username: user.email!,
-      orgId: user.orgId!,
-      role,
-    });
+    const token = issueToken(
+      { userId: user.id, username: user.email!, orgId: user.orgId!, role },
+      authConfig.jwtTtl,
+    );
 
     return c.json({ token, user: { id: user.id, username: user.email!, orgId: user.orgId!, role } });
   });
