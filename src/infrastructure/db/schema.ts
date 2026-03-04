@@ -5,6 +5,8 @@ import {
   timestamp,
   jsonb,
   integer,
+  numeric,
+  boolean,
   index,
   uniqueIndex,
   pgEnum,
@@ -172,6 +174,34 @@ export const oauthTokens = pgTable(
   })
 );
 
+export const catalogs = pgTable("catalogs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: text("org_id").notNull(),
+  name: text("name").notNull(),
+  effectiveDate: timestamp("effective_date", { withTimezone: true }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const catalogItems = pgTable(
+  "catalog_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catalogId: uuid("catalog_id")
+      .notNull()
+      .references(() => catalogs.id, { onDelete: "cascade" }),
+    code: integer("code").notNull(),
+    name: text("name").notNull(),
+    pricePerUnit: numeric("price_per_unit", { precision: 10, scale: 2 }).notNull(),
+    unit: text("unit").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    catalogIdx: index("catalog_items_catalog_id_idx").on(t.catalogId),
+  })
+);
+
 // Embedding dimension: 768 for Gemini gemini-embedding-001 (default)
 // 1536 for OpenAI text-embedding-3-small — set EMBEDDING_DIM env var to override
 const EMBEDDING_DIM = Number(process.env["EMBEDDING_DIM"] ?? 768);
@@ -261,6 +291,17 @@ export const oauthTokensRelations = relations(oauthTokens, ({ one }) => ({
   }),
 }));
 
+export const catalogsRelations = relations(catalogs, ({ many }) => ({
+  items: many(catalogItems),
+}));
+
+export const catalogItemsRelations = relations(catalogItems, ({ one }) => ({
+  catalog: one(catalogs, {
+    fields: [catalogItems.catalogId],
+    references: [catalogs.id],
+  }),
+}));
+
 // ============================================================
 // Types
 // ============================================================
@@ -281,3 +322,7 @@ export type WhatsappSession = typeof whatsappSessions.$inferSelect;
 export type NewWhatsappSession = typeof whatsappSessions.$inferInsert;
 export type OAuthToken = typeof oauthTokens.$inferSelect;
 export type NewOAuthToken = typeof oauthTokens.$inferInsert;
+export type Catalog = typeof catalogs.$inferSelect;
+export type NewCatalog = typeof catalogs.$inferInsert;
+export type CatalogItem = typeof catalogItems.$inferSelect;
+export type NewCatalogItem = typeof catalogItems.$inferInsert;

@@ -43,4 +43,14 @@ export class ConversationManager {
     const conv = await this.repo.create({ title, userId });
     return conv.id;
   }
+
+  /** Persist user + assistant messages and update conversation timestamp. */
+  async persistMessages(
+    conversationId: string,
+    userMessage: string,
+    assistantMessage: string,
+    metadata: { model?: string; retrievedChunks?: string[] },
+  ): Promise<void> {
+    await this.repo.persistMessages({ conversationId, userMessage, assistantMessage, metadata });
+  }
 }

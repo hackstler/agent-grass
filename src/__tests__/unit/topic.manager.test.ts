@@ -43,10 +43,8 @@ describe("TopicManager", () => {
       expect(result).toEqual(topic);
     });
 
-    it("throws ConflictError when repo throws with cause.code 23505", async () => {
-      const dbError = new Error("duplicate key");
-      (dbError as unknown as Record<string, unknown>).cause = { code: "23505" };
-      repo.create.mockRejectedValue(dbError);
+    it("propagates ConflictError thrown by repo", async () => {
+      repo.create.mockRejectedValue(new ConflictError("Topic", "name 'Duplicate'"));
 
       await expect(manager.create("org-1", "Duplicate")).rejects.toThrow(ConflictError);
     });

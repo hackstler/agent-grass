@@ -15,6 +15,13 @@
       "when": 1772656200000,
       "tag": "0005_add_role_column_require_org_id",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772656300000,
+      "tag": "0006_add_catalog_tables",
+      "breakpoints": true
     }
   ]
 }

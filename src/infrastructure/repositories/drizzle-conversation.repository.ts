@@ -5,6 +5,7 @@ import type { Conversation, NewConversation } from "../db/schema.js";
 import type {
   ConversationRepository,
   ConversationWithMessages,
+  PersistMessagesData,
 } from "../../domain/ports/repositories/conversation.repository.js";
 
 export class DrizzleConversationRepository implements ConversationRepository {
@@ -80,5 +81,17 @@ export class DrizzleConversationRepository implements ConversationRepository {
       .where(eq(conversations.id, id))
       .returning({ id: conversations.id });
     return result.length > 0;
+  }
+
+  async persistMessages(data: PersistMessagesData): Promise<void> {
+    await db.insert(messages).values([
+      { conversationId: data.conversationId, role: "user" as const, content: data.userMessage },
+      { conversationId: data.conversationId, role: "assistant" as const, content: data.assistantMessage, metadata: data.metadata },
+    ]);
+
+    await db
+      .update(conversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(conversations.id, data.conversationId));
   }
 }

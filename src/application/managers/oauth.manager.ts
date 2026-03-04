@@ -1,5 +1,5 @@
 import type { OAuthTokenRepository } from "../../domain/ports/repositories/oauth-token.repository.js";
-import { encryptToken, decryptToken } from "../../infrastructure/crypto/token-encryption.js";
+import type { TokenEncryption } from "../../domain/ports/token-encryption.js";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -23,7 +23,10 @@ interface TokenResponse {
 }
 
 export class OAuthManager {
-  constructor(private readonly tokenRepo: OAuthTokenRepository) {}
+  constructor(
+    private readonly tokenRepo: OAuthTokenRepository,
+    private readonly crypto: TokenEncryption,
+  ) {}
 
   getAuthorizeUrl(userId: string, frontendUrl?: string): string {
     const clientId = process.env["GOOGLE_OAUTH_CLIENT_ID"];
@@ -86,8 +89,8 @@ export class OAuthManager {
     await this.tokenRepo.upsert({
       userId: parsed.userId,
       provider: "google",
-      accessTokenEncrypted: encryptToken(tokens.access_token),
-      refreshTokenEncrypted: encryptToken(tokens.refresh_token ?? ""),
+      accessTokenEncrypted: this.crypto.encrypt(tokens.access_token),
+      refreshTokenEncrypted: this.crypto.encrypt(tokens.refresh_token ?? ""),
       tokenExpiry: new Date(Date.now() + tokens.expires_in * 1000),
       scopes: tokens.scope,
     });
@@ -109,7 +112,7 @@ export class OAuthManager {
     if (token) {
       // Best-effort revoke
       try {
-        const accessToken = decryptToken(token.accessTokenEncrypted);
+        const accessToken = this.crypto.decrypt(token.accessTokenEncrypted);
         await fetch(`${GOOGLE_REVOKE_URL}?token=${accessToken}`, { method: "POST" });
       } catch {
         // Ignore revoke errors
@@ -128,11 +131,11 @@ export class OAuthManager {
 
     // If token is still valid (with 5-min buffer), return it
     if (token.tokenExpiry && token.tokenExpiry.getTime() > Date.now() + 5 * 60 * 1000) {
-      return decryptToken(token.accessTokenEncrypted);
+      return this.crypto.decrypt(token.accessTokenEncrypted);
     }
 
     // Refresh the token
-    const refreshToken = decryptToken(token.refreshTokenEncrypted);
+    const refreshToken = this.crypto.decrypt(token.refreshTokenEncrypted);
     if (!refreshToken) {
       throw new Error("No refresh token available. Please reconnect your Google account.");
     }
@@ -163,9 +166,9 @@ export class OAuthManager {
     await this.tokenRepo.upsert({
       userId,
       provider: "google",
-      accessTokenEncrypted: encryptToken(tokens.access_token),
+      accessTokenEncrypted: this.crypto.encrypt(tokens.access_token),
       refreshTokenEncrypted: tokens.refresh_token
-        ? encryptToken(tokens.refresh_token)
+        ? this.crypto.encrypt(tokens.refresh_token)
         : token.refreshTokenEncrypted,
       tokenExpiry: new Date(Date.now() + tokens.expires_in * 1000),
       scopes: tokens.scope || token.scopes,

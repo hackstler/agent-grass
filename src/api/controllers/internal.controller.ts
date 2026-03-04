@@ -5,9 +5,48 @@ import { RequestContext } from "@mastra/core/request-context";
 import type { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
 import type { ConversationManager } from "../../application/managers/conversation.manager.js";
 import { extractSources } from "../helpers/extract-sources.js";
-import { persistMessages } from "../helpers/persist-messages.js";
 import { formatForWhatsApp, buildSourcesFooter } from "../helpers/format-whatsapp.js";
 import { ragConfig } from "../../plugins/rag/config/rag.config.js";
+
+interface DocumentAttachment {
+  pdfBase64: string;
+  filename: string;
+}
+
+interface QuoteToolPayload {
+  success?: boolean;
+  pdfBase64?: string;
+  filename?: string;
+}
+
+/**
+ * Scans delegation steps for a calculateBudget tool result containing a PDF.
+ * Returns the base64 PDF + filename if found, otherwise null.
+ */
+function extractPdfFromSteps(
+  steps: Array<{ toolResults?: Array<unknown> }>
+): DocumentAttachment | null {
+  for (const step of steps) {
+    for (const tr of step.toolResults ?? []) {
+      const payload = (tr as { payload?: QuoteToolPayload }).payload;
+      if (payload?.success && payload.pdfBase64 && payload.filename) {
+        return { pdfBase64: payload.pdfBase64, filename: payload.filename };
+      }
+      // Check nested delegation results
+      const delegationPayload = (tr as {
+        payload?: { result?: { toolResults?: Array<unknown> } };
+      }).payload;
+      const nested = delegationPayload?.result?.toolResults ?? [];
+      for (const ntr of nested) {
+        const np = (ntr as { payload?: QuoteToolPayload }).payload;
+        if (np?.success && np.pdfBase64 && np.filename) {
+          return { pdfBase64: np.pdfBase64, filename: np.filename };
+        }
+      }
+    }
+  }
+  return null;
+}
 
 const qrSchema = z.object({
   qrData: z.string().min(1),
@@ -136,7 +175,7 @@ export function createInternalController(
 
       // Persist messages separately — don't let a DB error kill the reply
       try {
-        await persistMessages(conversationId, messageBody, replyText, {
+        await convManager.persistMessages(conversationId, messageBody, replyText, {
           model: ragConfig.llmModel,
           retrievedChunks: sources.map((s) => s.id),
         });
@@ -146,8 +185,11 @@ export function createInternalController(
 
       const waText = formatForWhatsApp(replyText) + buildSourcesFooter(sources);
 
+      // Check for PDF attachment from quote tool
+      const document = extractPdfFromSteps(steps);
+
       return c.json({
-        data: { reply: waText },
+        data: { reply: waText, ...(document ? { document } : {}) },
       });
     } catch (error) {
       console.error("[internal/message] agent error:", error);

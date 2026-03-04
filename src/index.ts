@@ -25,6 +25,8 @@ import { RagPlugin } from "./plugins/rag/index.js";
 import { YouTubePlugin } from "./plugins/youtube/index.js";
 import { GmailPlugin } from "./plugins/gmail/index.js";
 import { CalendarPlugin } from "./plugins/calendar/index.js";
+import { QuotePlugin } from "./plugins/quote/index.js";
+import { seedCatalog } from "./infrastructure/db/catalog-seed.js";
 import { OAuthManagerAdapter } from "./plugins/google-common/oauth-manager-adapter.js";
 
 // Coordinator agent
@@ -33,6 +35,7 @@ import { createCoordinatorAgent } from "./agent/coordinator.js";
 // Auth strategy
 import { authConfig } from "./config/auth.config.js";
 import { createAuthStrategy } from "./infrastructure/auth/strategy-factory.js";
+import { AesTokenEncryption } from "./infrastructure/crypto/token-encryption.js";
 
 // App factory
 import { createApp } from "./app.js";
@@ -60,7 +63,8 @@ const convManager = new ConversationManager(convRepo);
 const waManager = new WhatsAppManager(sessionRepo, userRepo);
 const topicManager = new TopicManager(topicRepo);
 const orgManager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, PASSWORD_SALT);
-const oauthManager = new OAuthManager(oauthTokenRepo);
+const tokenEncryption = new AesTokenEncryption();
+const oauthManager = new OAuthManager(oauthTokenRepo, tokenEncryption);
 
 // 3. Plugin registry
 const pluginRegistry = new PluginRegistry();
@@ -71,12 +75,14 @@ pluginRegistry.register(new YouTubePlugin());
 const oauthProvider = new OAuthManagerAdapter(oauthManager);
 pluginRegistry.register(new GmailPlugin(oauthProvider));
 pluginRegistry.register(new CalendarPlugin(oauthProvider));
+pluginRegistry.register(new QuotePlugin());
 
 // 4. Coordinator agent (uses all plugin tools)
 const coordinatorAgent = createCoordinatorAgent(pluginRegistry);
 
-// Wire coordinator into RAG plugin so /chat uses coordinator (enables Gmail/Calendar from dashboard)
+// Wire coordinator + convManager into RAG plugin so /chat uses coordinator (enables Gmail/Calendar from dashboard)
 ragPlugin.setCoordinatorAgent(coordinatorAgent);
+ragPlugin.setConversationManager(convManager);
 
 // 5. Create app
 const app = createApp({
@@ -120,6 +126,16 @@ async function main() {
   await pluginRegistry.ensureTablesForAll();
 
   await seedAdminUser();
+
+  // Seed catalog for admin org (uses ADMIN_USERNAME or ADMIN_EMAIL as orgId)
+  const adminOrgId = process.env["ADMIN_USERNAME"] ?? process.env["ADMIN_EMAIL"];
+  if (adminOrgId) {
+    try {
+      await seedCatalog(adminOrgId);
+    } catch (err) {
+      console.error("[seed:catalog] error (non-fatal):", err instanceof Error ? err.message : err);
+    }
+  }
 
   await pluginRegistry.initializeAll();
 

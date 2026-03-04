@@ -7,9 +7,7 @@ vi.mock("../../infrastructure/db/client.js", () => ({
   runMigrations: vi.fn(),
 }));
 
-vi.mock("../../api/helpers/persist-messages.js", () => ({
-  persistMessages: vi.fn().mockResolvedValue(undefined),
-}));
+
 
 import { createTestApp, createAuthHeaders, createWorkerHeaders, type TestContext } from "../helpers/test-app.js";
 import { fakeUser, fakeSession } from "../helpers/mock-repos.js";

@@ -3,6 +3,7 @@ import { db } from "../db/client.js";
 import { topics, documents } from "../db/schema.js";
 import type { Topic, NewTopic, Document } from "../db/schema.js";
 import type { TopicRepository } from "../../domain/ports/repositories/topic.repository.js";
+import { ConflictError } from "../../domain/errors/index.js";
 
 export class DrizzleTopicRepository implements TopicRepository {
   async findById(id: string): Promise<Topic | null> {
@@ -45,8 +46,16 @@ export class DrizzleTopicRepository implements TopicRepository {
   }
 
   async create(data: NewTopic): Promise<Topic> {
-    const [topic] = await db.insert(topics).values(data).returning();
-    return topic!;
+    try {
+      const [topic] = await db.insert(topics).values(data).returning();
+      return topic!;
+    } catch (err: unknown) {
+      const cause = (err as { cause?: { code?: string } }).cause;
+      if (cause?.code === "23505") {
+        throw new ConflictError("Topic", `name '${data.name}'`);
+      }
+      throw err;
+    }
   }
 
   async update(

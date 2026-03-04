@@ -10,10 +10,6 @@ vi.mock("../../infrastructure/db/client.js", () => ({
   runMigrations: vi.fn(),
 }));
 
-vi.mock("../../api/helpers/persist-messages.js", () => ({
-  persistMessages: vi.fn().mockResolvedValue(undefined),
-}));
-
 // ── Imports (resolved after mocks) ──────────────────────────────────────────
 
 import { createApp, type AppDependencies } from "../../app.js";

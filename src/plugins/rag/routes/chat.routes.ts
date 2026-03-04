@@ -1,14 +1,11 @@
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
 import type { Agent } from "@mastra/core/agent";
 import { RequestContext } from "@mastra/core/request-context";
 import { ragConfig } from "../config/rag.config.js";
-import { db } from "../../../infrastructure/db/client.js";
-import { conversations } from "../../../infrastructure/db/schema.js";
 import { extractSources } from "../../../api/helpers/extract-sources.js";
-import { persistMessages } from "../../../api/helpers/persist-messages.js";
+import type { ConversationManager } from "../../../application/managers/conversation.manager.js";
 
 const chatSchema = z.object({
   query: z.string().min(1).max(10_000),
@@ -19,7 +16,7 @@ const chatSchema = z.object({
 /**
  * Factory: creates chat routes bound to a specific RAG agent instance.
  */
-export function createChatRoutes(agent: Agent): Hono {
+export function createChatRoutes(agent: Agent, convManager: ConversationManager): Hono {
   const chat = new Hono();
 
   /**
@@ -38,7 +35,7 @@ export function createChatRoutes(agent: Agent): Hono {
     const orgId = c.get("user")?.orgId;
     if (!orgId) return c.json({ error: "Unauthorized", message: "Missing orgId" }, 401);
     const userId = c.get("user")?.userId;
-    const conversationId = await resolveConversationId(parsed.data.conversationId);
+    const conversationId = await resolveConversationId(parsed.data.conversationId, convManager, userId);
 
     const requestContext = new RequestContext([['userId', userId ?? 'anonymous'], ['orgId', orgId]]);
 
@@ -49,7 +46,7 @@ export function createChatRoutes(agent: Agent): Hono {
 
     const sources = extractSources(result.steps ?? []);
 
-    await persistMessages(conversationId, query, result.text, {
+    await convManager.persistMessages(conversationId, query, result.text, {
       model: ragConfig.llmModel,
       retrievedChunks: sources.map((s) => s.id),
     });
@@ -90,7 +87,7 @@ export function createChatRoutes(agent: Agent): Hono {
       return c.json({ error: parsed.error.message }, 400);
     }
 
-    const conversationId = await resolveConversationId(parsed.data.conversationId);
+    const conversationId = await resolveConversationId(parsed.data.conversationId, convManager, userId);
 
     c.header("Content-Type", "text/event-stream");
     c.header("Cache-Control", "no-cache");
@@ -150,7 +147,7 @@ export function createChatRoutes(agent: Agent): Hono {
         }
 
         if (fullAnswer) {
-          await persistMessages(conversationId, parsed.data.query, fullAnswer, {
+          await convManager.persistMessages(conversationId, parsed.data.query, fullAnswer, {
             model: ragConfig.llmModel,
             retrievedChunks: collectedSources.map((s) => s.id),
           });
@@ -171,19 +168,20 @@ export function createChatRoutes(agent: Agent): Hono {
 // Helpers
 // ============================================================
 
-async function resolveConversationId(id?: string): Promise<string> {
+async function resolveConversationId(
+  id: string | undefined,
+  convManager: ConversationManager,
+  userId?: string,
+): Promise<string> {
   if (id) {
-    const conv = await db.query.conversations.findFirst({
-      where: eq(conversations.id, id),
-      columns: { id: true },
-    });
-    if (conv) return id;
+    try {
+      await convManager.getById(id);
+      return id;
+    } catch {
+      // not found — fall through to create
+    }
   }
 
-  const [conv] = await db
-    .insert(conversations)
-    .values({ title: "New conversation" })
-    .returning({ id: conversations.id });
-
-  return conv!.id;
+  const conv = await convManager.create({ userId, title: "New conversation" });
+  return conv.id;
 }

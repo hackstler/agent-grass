@@ -1,6 +1,6 @@
 import type { Topic, Document } from "../../domain/entities/index.js";
 import type { TopicRepository } from "../../domain/ports/repositories/topic.repository.js";
-import { NotFoundError, ConflictError } from "../../domain/errors/index.js";
+import { NotFoundError } from "../../domain/errors/index.js";
 
 export class TopicManager {
   constructor(private readonly repo: TopicRepository) {}
@@ -10,15 +10,7 @@ export class TopicManager {
   }
 
   async create(orgId: string, name: string, description?: string): Promise<Topic> {
-    try {
-      return await this.repo.create({ orgId, name, description });
-    } catch (err: unknown) {
-      const cause = (err as { cause?: { code?: string } }).cause;
-      if (cause?.code === "23505") {
-        throw new ConflictError("Topic", `name '${name}'`);
-      }
-      throw err;
-    }
+    return this.repo.create({ orgId, name, description });
   }
 
   async update(
