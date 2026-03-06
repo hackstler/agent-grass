@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 import type { Agent } from "@mastra/core/agent";
 import { RequestContext } from "@mastra/core/request-context";
 import type { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
@@ -7,47 +8,7 @@ import type { ConversationManager } from "../../application/managers/conversatio
 import { extractSources } from "../helpers/extract-sources.js";
 import { formatForWhatsApp, buildSourcesFooter } from "../helpers/format-whatsapp.js";
 import { ragConfig } from "../../plugins/rag/config/rag.config.js";
-
-interface DocumentAttachment {
-  pdfBase64: string;
-  filename: string;
-}
-
-/**
- * Deep-search any object tree for a node containing pdfBase64 + filename.
- * Avoids depending on a specific Mastra payload wrapper structure.
- */
-function deepFindPdf(obj: unknown, depth = 0): DocumentAttachment | null {
-  if (depth > 10 || obj == null || typeof obj !== "object") return null;
-
-  const rec = obj as Record<string, unknown>;
-
-  // Check if THIS object has the PDF fields
-  if (
-    typeof rec["pdfBase64"] === "string" && rec["pdfBase64"].length > 0 &&
-    typeof rec["filename"] === "string" && rec["filename"].length > 0
-  ) {
-    return { pdfBase64: rec["pdfBase64"] as string, filename: rec["filename"] as string };
-  }
-
-  // Recurse into arrays and object values
-  const values = Array.isArray(obj) ? obj : Object.values(rec);
-  for (const v of values) {
-    const found = deepFindPdf(v, depth + 1);
-    if (found) return found;
-  }
-  return null;
-}
-
-/**
- * Scans agent result steps for a PDF attachment (from calculateBudget tool).
- * Uses deep recursive search to be resilient to Mastra payload wrapping changes.
- */
-function extractPdfFromSteps(
-  steps: Array<{ toolResults?: Array<unknown> }>
-): DocumentAttachment | null {
-  return deepFindPdf(steps);
-}
+import { pdfStore } from "../../plugins/quote/services/pdf-store.js";
 
 const qrSchema = z.object({
   qrData: z.string().min(1),
@@ -154,7 +115,8 @@ export function createInternalController(
         userId,
       );
 
-      const requestContext = new RequestContext([['userId', userId], ['orgId', orgId]]);
+      const pdfRequestId = randomUUID();
+      const requestContext = new RequestContext([['userId', userId], ['orgId', orgId], ['pdfRequestId', pdfRequestId]]);
 
       const result = await agent.generate(messageBody, {
         requestContext,
@@ -187,21 +149,11 @@ export function createInternalController(
 
       const waText = formatForWhatsApp(replyText) + buildSourcesFooter(sources);
 
-      // Check for PDF attachment from quote tool
-      const document = extractPdfFromSteps(result.steps ?? []);
+      // Retrieve PDF from shared in-memory store (bypasses Mastra step wrapping)
+      const document = pdfStore.take(pdfRequestId);
 
       if (document) {
-        console.log("[internal/message] PDF found:", document.filename);
-      } else {
-        // Log step structure to debug missing PDFs
-        const stepSummary = (result.steps ?? []).map((s, i) => ({
-          step: i,
-          toolResults: (s.toolResults ?? []).map((tr) => {
-            const p = (tr as { payload?: { toolName?: string } }).payload;
-            return p?.toolName ?? "unknown";
-          }),
-        }));
-        console.log("[internal/message] no PDF found. steps:", JSON.stringify(stepSummary));
+        console.log("[internal/message] PDF found via store:", document.filename);
       }
 
       return c.json({

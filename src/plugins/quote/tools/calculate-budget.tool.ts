@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { CatalogService } from "../services/catalog.service.js";
 import type { PdfService, QuoteLineItem } from "../services/pdf.service.js";
 import { quoteConfig } from "../config/quote.config.js";
+import { pdfStore } from "../services/pdf-store.js";
 
 export interface CalculateBudgetDeps {
   catalogService: CatalogService;
@@ -116,6 +117,13 @@ Returns a formatted summary and a PDF attachment.`,
         vatAmount,
         total,
       });
+
+      // Store PDF in shared memory so the controller can retrieve it
+      // without depending on Mastra's opaque step/payload wrapping.
+      const pdfRequestId = context?.requestContext?.get("pdfRequestId") as string | undefined;
+      if (pdfRequestId && pdfBase64) {
+        pdfStore.set(pdfRequestId, { pdfBase64, filename });
+      }
 
       return {
         success: true,
