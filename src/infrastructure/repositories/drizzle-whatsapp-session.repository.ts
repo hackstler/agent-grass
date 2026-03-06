@@ -1,4 +1,4 @@
-import { eq, ne } from "drizzle-orm";
+import { eq, ne, and, lt, inArray } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { whatsappSessions } from "../db/schema.js";
 import type { WhatsappSession, NewWhatsappSession } from "../db/schema.js";
@@ -13,6 +13,19 @@ export class DrizzleWhatsAppSessionRepository implements WhatsAppSessionReposito
   }
 
   async findAllActive(): Promise<Pick<WhatsappSession, "userId" | "orgId">[]> {
+    // Auto-disconnect stale sessions: qr/pending not updated in 5 minutes are zombies.
+    // This prevents zombie sessions from filling MAX_SESSIONS and blocking new connections.
+    const staleThreshold = new Date(Date.now() - 5 * 60 * 1000);
+    await db
+      .update(whatsappSessions)
+      .set({ status: "disconnected", qrData: null, updatedAt: new Date() })
+      .where(
+        and(
+          inArray(whatsappSessions.status, ["qr", "pending"]),
+          lt(whatsappSessions.updatedAt, staleThreshold),
+        ),
+      );
+
     return db
       .select({ userId: whatsappSessions.userId, orgId: whatsappSessions.orgId })
       .from(whatsappSessions)
