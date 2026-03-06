@@ -28,8 +28,8 @@ describe("UserManager", () => {
   // ── register ────────────────────────────────────────────────────────────────
 
   describe("register", () => {
-    it("first user becomes admin regardless of callerRole", async () => {
-      const user = fakeUser({ role: "admin", metadata: { passwordHash: hashPassword("pass") } });
+    it("first user becomes super_admin regardless of callerRole", async () => {
+      const user = fakeUser({ role: "super_admin", metadata: { passwordHash: hashPassword("pass") } });
       repo.count.mockResolvedValue(0);
       repo.findByEmail.mockResolvedValue(null);
       repo.create.mockResolvedValue(user);
@@ -41,10 +41,10 @@ describe("UserManager", () => {
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "alice",
-          role: "admin",
+          role: "super_admin",
         }),
       );
-      expect(result.role).toBe("admin");
+      expect(result.role).toBe("super_admin");
     });
 
     it("throws ForbiddenError when non-admin tries to register after first user", async () => {
@@ -69,6 +69,26 @@ describe("UserManager", () => {
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "bob",
+          role: "user",
+        }),
+      );
+      expect(result.role).toBe("user");
+    });
+
+    it("allows super_admin to register subsequent users", async () => {
+      const user = fakeUser({ email: "carol", role: "user", metadata: { passwordHash: hashPassword("pass") } });
+      repo.count.mockResolvedValue(1);
+      repo.findByEmail.mockResolvedValue(null);
+      repo.create.mockResolvedValue(user);
+
+      const result = await manager.register(
+        { username: "carol", password: "pass" },
+        "super_admin",
+      );
+
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: "carol",
           role: "user",
         }),
       );

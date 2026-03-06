@@ -29,7 +29,7 @@ describe("Auth API", () => {
   // ── POST /auth/register ──────────────────────────────────────────────────
 
   describe("POST /auth/register", () => {
-    it("first user becomes auto-admin without auth header", async () => {
+    it("first user becomes auto-super_admin without auth header", async () => {
       const user = fakeUser({ id: "u-1", email: "alice", orgId: "alice" });
       ctx.repos.user.count.mockResolvedValue(0);
       ctx.repos.user.findByEmail.mockResolvedValue(null);
@@ -44,11 +44,31 @@ describe("Auth API", () => {
       expect(res.status).toBe(201);
       const data = await res.json();
       expect(data.token).toBeDefined();
-      expect(data.user.role).toBe("admin");
+      expect(data.user.role).toBe("super_admin");
     });
 
-    it("second user registration succeeds with admin auth", async () => {
+    it("second user registration succeeds with super_admin auth", async () => {
       const user = fakeUser({ id: "u-2", email: "bob", orgId: "bob" });
+      ctx.repos.user.count.mockResolvedValue(1);
+      ctx.repos.user.findByEmail.mockResolvedValue(null);
+      ctx.repos.user.create.mockResolvedValue(user);
+
+      const res = await ctx.app.request("/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "super_admin" }),
+        },
+        body: JSON.stringify({ username: "bob", password: "password123" }),
+      });
+
+      expect(res.status).toBe(201);
+      const data = await res.json();
+      expect(data.token).toBeDefined();
+    });
+
+    it("second user registration succeeds with org-scoped admin auth", async () => {
+      const user = fakeUser({ id: "u-3", email: "carol", orgId: "carol" });
       ctx.repos.user.count.mockResolvedValue(1);
       ctx.repos.user.findByEmail.mockResolvedValue(null);
       ctx.repos.user.create.mockResolvedValue(user);
@@ -59,12 +79,10 @@ describe("Auth API", () => {
           "Content-Type": "application/json",
           ...createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "admin" }),
         },
-        body: JSON.stringify({ username: "bob", password: "password123" }),
+        body: JSON.stringify({ username: "carol", password: "password123" }),
       });
 
       expect(res.status).toBe(201);
-      const data = await res.json();
-      expect(data.token).toBeDefined();
     });
 
     it("returns 403 when non-admin tries to register after first user", async () => {
@@ -122,7 +140,30 @@ describe("Auth API", () => {
   // ── GET /auth/me ──────────────────────────────────────────────────────────
 
   describe("GET /auth/me", () => {
-    it("returns user info with valid JWT", async () => {
+    it("returns user info with valid JWT (super_admin)", async () => {
+      const headers = createAuthHeaders({
+        userId: "u-1",
+        username: "alice",
+        orgId: "org-1",
+        role: "super_admin",
+      });
+
+      const res = await ctx.app.request("/auth/me", {
+        method: "GET",
+        headers,
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data).toMatchObject({
+        userId: "u-1",
+        username: "alice",
+        orgId: "org-1",
+        role: "super_admin",
+      });
+    });
+
+    it("returns user info with valid JWT (admin)", async () => {
       const headers = createAuthHeaders({
         userId: "u-1",
         username: "alice",

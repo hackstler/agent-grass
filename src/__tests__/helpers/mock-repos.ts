@@ -77,6 +77,8 @@ export function createMockSessionRepo(): {
   return {
     findByUserId: vi.fn(),
     findAllActive: vi.fn(),
+    findAllWithUser: vi.fn(),
+    findAllWithUserByOrg: vi.fn(),
     upsertByUserId: vi.fn(),
     updateByUserId: vi.fn(),
     create: vi.fn(),

@@ -41,7 +41,7 @@ export function createAuthHeaders(payload: {
   userId: string;
   username: string;
   orgId: string;
-  role: "admin" | "user";
+  role: "admin" | "user" | "super_admin";
 }): Record<string, string> {
   const token = jwt.sign(payload, TEST_JWT_SECRET, { expiresIn: "1h" });
   return { Authorization: `Bearer ${token}` };

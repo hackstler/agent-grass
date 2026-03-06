@@ -36,6 +36,13 @@
       "when": 1772656500000,
       "tag": "0008_add_catalog_item_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772656600000,
+      "tag": "0009_add_super_admin_role",
+      "breakpoints": true
     }
   ]
 }
