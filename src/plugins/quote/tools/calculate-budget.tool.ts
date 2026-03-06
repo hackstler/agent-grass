@@ -1,16 +1,36 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { CatalogService } from "../services/catalog.service.js";
-import type { PdfService, QuoteLineItem } from "../services/pdf.service.js";
+import type { PdfService, QuoteLineItem, CompanyDetails } from "../services/pdf.service.js";
+import type { AttachmentStore } from "../../../domain/ports/attachment-store.js";
+import type { OrganizationRepository } from "../../../domain/ports/repositories/organization.repository.js";
 import { quoteConfig } from "../config/quote.config.js";
 import { pdfStore } from "../services/pdf-store.js";
 
 export interface CalculateBudgetDeps {
   catalogService: CatalogService;
   pdfService: PdfService;
+  attachmentStore: AttachmentStore;
+  organizationRepo: OrganizationRepository;
 }
 
-export function createCalculateBudgetTool({ catalogService, pdfService }: CalculateBudgetDeps) {
+/** Build CompanyDetails from org record, falling back to quoteConfig defaults. */
+function resolveCompanyDetails(
+  org: { name: string | null; address: string | null; phone: string | null; email: string | null; nif: string | null; logo: string | null; vatRate: string | null; currency: string } | null,
+): CompanyDetails {
+  return {
+    name:     org?.name    ?? quoteConfig.companyName,
+    address:  org?.address ?? quoteConfig.companyAddress,
+    phone:    org?.phone   ?? quoteConfig.companyPhone,
+    email:    org?.email   ?? quoteConfig.companyEmail,
+    nif:      org?.nif     ?? quoteConfig.companyNif,
+    logo:     org?.logo    ?? null,
+    vatRate:  org?.vatRate  ? Number(org.vatRate) : quoteConfig.vatRate,
+    currency: org?.currency ?? quoteConfig.currency,
+  };
+}
+
+export function createCalculateBudgetTool({ catalogService, pdfService, attachmentStore, organizationRepo }: CalculateBudgetDeps) {
   return createTool({
     id: "calculateBudget",
     description: `Calculate a price quote for artificial grass installation and generate a PDF.
@@ -28,7 +48,7 @@ Returns a formatted summary and a PDF attachment.`,
           quantity: z.number().positive().describe("Quantity in the item's unit (m² or km)"),
         })
       ).min(1).describe("List of items with product name/code and quantity"),
-      applyVat: z.boolean().default(true).describe("Whether to include 21% VAT"),
+      applyVat: z.boolean().default(true).describe("Whether to include VAT"),
     }),
 
     outputSchema: z.object({
@@ -65,7 +85,12 @@ Returns a formatted summary and a PDF attachment.`,
         };
       }
 
-      const catalogId = await catalogService.getActiveCatalogId(orgId);
+      // Fetch org data and catalog in parallel
+      const [org, catalogId] = await Promise.all([
+        organizationRepo.findByOrgId(orgId),
+        catalogService.getActiveCatalogId(orgId),
+      ]);
+
       if (!catalogId) {
         return {
           success: false,
@@ -79,6 +104,8 @@ Returns a formatted summary and a PDF attachment.`,
           notFound: ["No active catalog found for this organization"],
         };
       }
+
+      const company = resolveCompanyDetails(org);
 
       const resolvedItems: QuoteLineItem[] = [];
       const notFound: string[] = [];
@@ -99,7 +126,7 @@ Returns a formatted summary and a PDF attachment.`,
       }
 
       const subtotal = Math.round(resolvedItems.reduce((s, i) => s + i.lineTotal, 0) * 100) / 100;
-      const vatAmount = applyVat ? Math.round(subtotal * quoteConfig.vatRate * 100) / 100 : 0;
+      const vatAmount = applyVat ? Math.round(subtotal * company.vatRate * 100) / 100 : 0;
       const total = Math.round((subtotal + vatAmount) * 100) / 100;
 
       const now = new Date();
@@ -110,6 +137,7 @@ Returns a formatted summary and a PDF attachment.`,
       const pdfBase64 = await pdfService.generateQuotePdf({
         quoteNumber,
         date: dateStr,
+        company,
         clientName,
         clientAddress,
         lineItems: resolvedItems,
@@ -118,11 +146,16 @@ Returns a formatted summary and a PDF attachment.`,
         total,
       });
 
-      // Store PDF keyed by pdfRequestId so the controller can retrieve it.
-      // pdfRequestId propagates through the same RequestContext as orgId (proven to work).
+      // Store PDF keyed by pdfRequestId so the controller can retrieve it (WhatsApp delivery).
       const pdfRequestId = context?.requestContext?.get("pdfRequestId") as string | undefined;
       if (pdfRequestId && pdfBase64) {
         pdfStore.set(pdfRequestId, { pdfBase64, filename });
+      }
+
+      // Store in shared AttachmentStore keyed by filename for cross-plugin retrieval
+      // (e.g., Gmail can attach this PDF in a follow-up request).
+      if (pdfBase64) {
+        attachmentStore.store(filename, { base64: pdfBase64, mimetype: "application/pdf", filename });
       }
 
       return {

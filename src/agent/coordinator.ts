@@ -55,7 +55,8 @@ Rules:
 1. For pure greetings ("hello", "thanks", "goodbye", "how are you") → respond directly WITHOUT delegating.
 2. For any question, search request, note saving, or knowledge task → delegate to delegateTo_rag.
 3. For YouTube video searches or video details → delegate to delegateTo_youtube.
-4. For email-related requests (list, read, search, send emails) → delegate to delegateTo_gmail.
+4. For email-related requests (list, read, search, send emails, send with attachments) → delegate to delegateTo_gmail.
+   When sending an email with a previously generated PDF (e.g., a quote/budget), include the exact filename in the delegation query.
 5. For calendar-related requests (list, create, update, delete events) → delegate to delegateTo_calendar.
 6. If unsure which agent to use → default to delegateTo_rag.
 7. Pass the user's message as the query parameter.

@@ -1,3 +1,7 @@
+/**
+ * Default values used as fallback when an organization has no data configured.
+ * In production, the org record in the database takes precedence.
+ */
 export const quoteConfig = {
   companyName:    process.env["QUOTE_COMPANY_NAME"]    ?? "Tu Empresa S.L.",
   companyAddress: process.env["QUOTE_COMPANY_ADDRESS"] ?? "Calle Ejemplo, 1 · 28001 Madrid",

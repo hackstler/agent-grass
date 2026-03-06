@@ -25,6 +25,12 @@ SENDING EMAILS:
 - When the query contains "CONFIRMED" or explicitly says to send immediately, execute sendEmail right away WITHOUT asking again.
 - NEVER ask for confirmation more than once for the same email.
 
+ATTACHMENTS:
+- When the user mentions attaching a document (PDF, quote, budget, "presupuesto"), use the attachmentFilename parameter in sendEmail.
+- The filename is always provided in the query (e.g., "PRES-20260306-1234.pdf"). Use it EXACTLY as given.
+- If the query mentions "the quote" or "the budget" and includes a filename, pass that filename to attachmentFilename.
+- If no filename is mentioned but the user says to attach "the quote" or "el presupuesto", ask them for the filename.
+
 If the user's Google account is not connected, inform them they need to connect it in Settings.`,
     model: google("gemini-2.5-flash"),
     tools,

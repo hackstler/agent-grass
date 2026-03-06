@@ -50,6 +50,48 @@ function getHeader(headers: Array<{ name: string; value: string }>, name: string
   return headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? "";
 }
 
+function buildPlainMessage(to: string, subject: string, body: string): string {
+  return [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "",
+    body,
+  ].join("\r\n");
+}
+
+function buildMultipartMessage(
+  to: string,
+  subject: string,
+  body: string,
+  attachment: { base64: string; mimetype: string; filename: string },
+): string {
+  const boundary = `__boundary_${Date.now()}_${Math.random().toString(36).slice(2)}__`;
+
+  // Break base64 into 76-char lines per RFC 2045
+  const base64Lines = attachment.base64.replace(/(.{76})/g, "$1\r\n");
+
+  return [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "",
+    body,
+    `--${boundary}`,
+    `Content-Type: ${attachment.mimetype}`,
+    "Content-Transfer-Encoding: base64",
+    `Content-Disposition: attachment; filename="${attachment.filename}"`,
+    "",
+    base64Lines,
+    `--${boundary}--`,
+  ].join("\r\n");
+}
+
 function extractTextBody(payload: ApiObject): string {
   if (payload["mimeType"] === "text/plain") {
     const bodyData = payload["body"]?.["data"];
@@ -152,17 +194,18 @@ export class GmailApiService {
   // sendEmail
   // -----------------------------------------------------------------------
 
-  async sendEmail(userId: string, to: string, subject: string, body: string): Promise<GmailSendResult> {
+  async sendEmail(
+    userId: string,
+    to: string,
+    subject: string,
+    body: string,
+    attachment?: { base64: string; mimetype: string; filename: string },
+  ): Promise<GmailSendResult> {
     const headers = await this.getAuthHeaders(userId);
 
-    const rawMessage = [
-      `To: ${to}`,
-      `Subject: ${subject}`,
-      "MIME-Version: 1.0",
-      "Content-Type: text/plain; charset=UTF-8",
-      "",
-      body,
-    ].join("\r\n");
+    const rawMessage = attachment
+      ? buildMultipartMessage(to, subject, body, attachment)
+      : buildPlainMessage(to, subject, body);
 
     const encodedMessage = toBase64Url(rawMessage);
 

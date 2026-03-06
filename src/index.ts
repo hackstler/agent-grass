@@ -30,6 +30,9 @@ import { QuotePlugin } from "./plugins/quote/index.js";
 import { seedCatalog } from "./infrastructure/db/catalog-seed.js";
 import { OAuthManagerAdapter } from "./plugins/google-common/oauth-manager-adapter.js";
 
+// Shared stores
+import { InMemoryAttachmentStore } from "./infrastructure/stores/in-memory-attachment-store.js";
+
 // Coordinator agent
 import { createCoordinatorAgent } from "./agent/coordinator.js";
 
@@ -75,9 +78,10 @@ pluginRegistry.register(ragPlugin);
 pluginRegistry.register(new YouTubePlugin());
 
 const oauthProvider = new OAuthManagerAdapter(oauthManager);
-pluginRegistry.register(new GmailPlugin(oauthProvider));
+const attachmentStore = new InMemoryAttachmentStore();
+pluginRegistry.register(new GmailPlugin(oauthProvider, attachmentStore));
 pluginRegistry.register(new CalendarPlugin(oauthProvider));
-pluginRegistry.register(new QuotePlugin());
+pluginRegistry.register(new QuotePlugin({ attachmentStore, organizationRepo: orgRepo }));
 
 // 4. Coordinator agent (uses all plugin tools)
 const coordinatorAgent = createCoordinatorAgent(pluginRegistry);
