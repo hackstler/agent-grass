@@ -10,6 +10,21 @@ import { formatForWhatsApp, buildSourcesFooter } from "../helpers/format-whatsap
 import { ragConfig } from "../../plugins/rag/config/rag.config.js";
 import { pdfStore } from "../../plugins/quote/services/pdf-store.js";
 
+export interface DocumentAttachment {
+  base64: string;
+  mimetype: string;
+  filename: string;
+}
+
+interface QuoteToolPayload {
+  toolName: string;
+  result?: {
+    success?: boolean;
+    pdfBase64?: string;
+    filename?: string;
+  };
+}
+
 const qrSchema = z.object({
   qrData: z.string().min(1),
   userId: z.string().uuid(),
@@ -64,6 +79,34 @@ function unwrapDelegationSteps(
   }
 
   return unwrapped.length > 0 ? unwrapped : steps;
+}
+
+/**
+ * Extracts a PDF attachment from the agent's tool result steps.
+ * Searches for calculateBudget tool results in Mastra's payload wrapper.
+ */
+function extractPdfFromSteps(
+  steps: Array<{ toolResults?: Array<unknown> }>
+): DocumentAttachment | null {
+  const allToolResults = steps.flatMap((s) => s.toolResults ?? []);
+
+  const quoteResult = allToolResults.find((r) => {
+    const payload = (r as { payload?: QuoteToolPayload }).payload;
+    return payload?.toolName === "calculateBudget";
+  });
+
+  if (!quoteResult) return null;
+
+  const payload = (quoteResult as { payload: QuoteToolPayload }).payload;
+  const result = payload.result;
+
+  if (!result?.success || !result.pdfBase64 || !result.filename) return null;
+
+  return {
+    base64: result.pdfBase64,
+    mimetype: "application/pdf",
+    filename: result.filename,
+  };
 }
 
 export function createInternalController(
@@ -149,15 +192,32 @@ export function createInternalController(
 
       const waText = formatForWhatsApp(replyText) + buildSourcesFooter(sources);
 
-      // Retrieve PDF from shared in-memory store (bypasses Mastra step wrapping)
-      const document = pdfStore.take(pdfRequestId);
+      // Extract PDF: try Mastra tool steps first, fall back to in-memory store
+      let document: DocumentAttachment | null = extractPdfFromSteps(steps);
+
+      if (!document) {
+        const storeEntry = pdfStore.take(pdfRequestId);
+        if (storeEntry) {
+          document = {
+            base64: storeEntry.pdfBase64,
+            mimetype: "application/pdf",
+            filename: storeEntry.filename,
+          };
+        }
+      } else {
+        // Clean up store entry if step extraction succeeded
+        pdfStore.take(pdfRequestId);
+      }
 
       if (document) {
-        console.log("[internal/message] PDF found via store:", document.filename);
+        console.log("[internal/message] PDF attached:", document.filename);
       }
 
       return c.json({
-        data: { reply: waText, ...(document ? { document } : {}) },
+        data: {
+          reply: waText,
+          ...(document && { document }),
+        },
       });
     } catch (error) {
       console.error("[internal/message] agent error:", error);
