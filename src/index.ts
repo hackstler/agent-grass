@@ -116,11 +116,7 @@ async function main() {
   await ensurePgVector();
   console.log("[startup] pgvector extension ready");
 
-  try {
-    await runMigrations();
-  } catch (err) {
-    console.error("[migrations] unexpected error (non-fatal):", err instanceof Error ? err.message : err);
-  }
+  await runMigrations();
   console.log("[startup] migrations applied");
 
   await pluginRegistry.ensureTablesForAll();

@@ -13,7 +13,7 @@ interface DocumentAttachment {
   filename: string;
 }
 
-interface QuoteToolPayload {
+interface QuoteToolResult {
   success?: boolean;
   pdfBase64?: string;
   filename?: string;
@@ -21,24 +21,22 @@ interface QuoteToolPayload {
 
 /**
  * Scans delegation steps for a calculateBudget tool result containing a PDF.
- * Returns the base64 PDF + filename if found, otherwise null.
+ * Mastra wraps tool return values as `{ payload: { toolName, result: <actual data> } }`.
  */
 function extractPdfFromSteps(
   steps: Array<{ toolResults?: Array<unknown> }>
 ): DocumentAttachment | null {
   for (const step of steps) {
     for (const tr of step.toolResults ?? []) {
-      const payload = (tr as { payload?: QuoteToolPayload }).payload;
-      if (payload?.success && payload.pdfBase64 && payload.filename) {
-        return { pdfBase64: payload.pdfBase64, filename: payload.filename };
+      const payload = (tr as { payload?: { toolName?: string; result?: QuoteToolResult } }).payload;
+      const result = payload?.result;
+      if (result?.success && result.pdfBase64 && result.filename) {
+        return { pdfBase64: result.pdfBase64, filename: result.filename };
       }
-      // Check nested delegation results
-      const delegationPayload = (tr as {
-        payload?: { result?: { toolResults?: Array<unknown> } };
-      }).payload;
-      const nested = delegationPayload?.result?.toolResults ?? [];
+      // Check nested delegation results (coordinator → sub-agent)
+      const nested = (payload?.result as { toolResults?: Array<unknown> } | undefined)?.toolResults ?? [];
       for (const ntr of nested) {
-        const np = (ntr as { payload?: QuoteToolPayload }).payload;
+        const np = (ntr as { payload?: { result?: QuoteToolResult } }).payload?.result;
         if (np?.success && np.pdfBase64 && np.filename) {
           return { pdfBase64: np.pdfBase64, filename: np.filename };
         }

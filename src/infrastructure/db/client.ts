@@ -38,17 +38,6 @@ export async function ensurePgVector(): Promise<void> {
   }
 }
 
-/**
- * Drizzle Kit official migration runner.
- *
- * Workflow:
- *   1. Change schema.ts
- *   2. Run: npx drizzle-kit generate
- *   3. Commit the generated SQL + snapshot + journal
- *   4. On deploy, this runs automatically and applies pending migrations
- *
- * Drizzle tracks applied migrations in __drizzle_migrations table.
- */
 export async function runMigrations(): Promise<void> {
   const base = process.env["NODE_ENV"] === "production"
     ? "dist/infrastructure/db/migrations"
@@ -57,4 +46,3 @@ export async function runMigrations(): Promise<void> {
 
   await migrate(db, { migrationsFolder });
 }
-
