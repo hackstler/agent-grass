@@ -17,6 +17,7 @@ coverage/
 # Google OAuth credentials — NUNCA commitear
 *.json
 !package.json
+!package-lock.json
 !tsconfig.json
 !src/infrastructure/db/migrations/meta/*.json
 
