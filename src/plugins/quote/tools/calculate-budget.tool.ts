@@ -118,11 +118,11 @@ Returns a formatted summary and a PDF attachment.`,
         total,
       });
 
-      // Store PDF in shared memory so the controller can retrieve it
-      // without depending on Mastra's opaque step/payload wrapping.
-      const pdfRequestId = context?.requestContext?.get("pdfRequestId") as string | undefined;
-      if (pdfRequestId && pdfBase64) {
-        pdfStore.set(pdfRequestId, { pdfBase64, filename });
+      // Store PDF keyed by filename — the controller extracts the filename
+      // from the agent's text response via regex. No dependency on
+      // RequestContext propagation through Mastra's delegation layers.
+      if (pdfBase64) {
+        pdfStore.set(filename, { pdfBase64, filename });
       }
 
       return {

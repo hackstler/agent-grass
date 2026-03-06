@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { randomUUID } from "crypto";
 import type { Agent } from "@mastra/core/agent";
 import { RequestContext } from "@mastra/core/request-context";
 import type { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
@@ -14,15 +13,6 @@ export interface DocumentAttachment {
   base64: string;
   mimetype: string;
   filename: string;
-}
-
-interface QuoteToolPayload {
-  toolName: string;
-  result?: {
-    success?: boolean;
-    pdfBase64?: string;
-    filename?: string;
-  };
 }
 
 const qrSchema = z.object({
@@ -44,12 +34,13 @@ const messageSchema = z.object({
 });
 
 /**
+ * Regex to find quote PDF filenames in agent text responses.
+ * Matches: PRES-YYYYMMDD-XXXX.pdf
+ */
+const QUOTE_FILENAME_RE = /PRES-\d{8}-\d{1,6}\.pdf/;
+
+/**
  * Unwraps nested toolResults from delegation steps.
- *
- * When the coordinator delegates to a sub-agent, the delegation tool returns
- * { text, toolResults } inside a Mastra payload wrapper. This function extracts
- * the nested toolResults so that extractSources() can find them as if the
- * tools had been called directly.
  */
 function unwrapDelegationSteps(
   steps: Array<{ toolResults?: Array<unknown> }>
@@ -79,34 +70,6 @@ function unwrapDelegationSteps(
   }
 
   return unwrapped.length > 0 ? unwrapped : steps;
-}
-
-/**
- * Extracts a PDF attachment from the agent's tool result steps.
- * Searches for calculateBudget tool results in Mastra's payload wrapper.
- */
-function extractPdfFromSteps(
-  steps: Array<{ toolResults?: Array<unknown> }>
-): DocumentAttachment | null {
-  const allToolResults = steps.flatMap((s) => s.toolResults ?? []);
-
-  const quoteResult = allToolResults.find((r) => {
-    const payload = (r as { payload?: QuoteToolPayload }).payload;
-    return payload?.toolName === "calculateBudget";
-  });
-
-  if (!quoteResult) return null;
-
-  const payload = (quoteResult as { payload: QuoteToolPayload }).payload;
-  const result = payload.result;
-
-  if (!result?.success || !result.pdfBase64 || !result.filename) return null;
-
-  return {
-    base64: result.pdfBase64,
-    mimetype: "application/pdf",
-    filename: result.filename,
-  };
 }
 
 export function createInternalController(
@@ -158,8 +121,7 @@ export function createInternalController(
         userId,
       );
 
-      const pdfRequestId = randomUUID();
-      const requestContext = new RequestContext([['userId', userId], ['orgId', orgId], ['pdfRequestId', pdfRequestId]]);
+      const requestContext = new RequestContext([['userId', userId], ['orgId', orgId]]);
 
       const result = await agent.generate(messageBody, {
         requestContext,
@@ -192,21 +154,23 @@ export function createInternalController(
 
       const waText = formatForWhatsApp(replyText) + buildSourcesFooter(sources);
 
-      // Extract PDF: try Mastra tool steps first, fall back to in-memory store
-      let document: DocumentAttachment | null = extractPdfFromSteps(steps);
-
-      if (!document) {
-        const storeEntry = pdfStore.take(pdfRequestId);
+      // Deterministic PDF retrieval: extract filename from agent text, look up in store.
+      // The calculateBudget tool always stores the PDF keyed by filename (e.g. PRES-20260306-1234.pdf).
+      // The agent always includes the filename in its text response.
+      // This approach has ZERO dependency on Mastra's RequestContext or step propagation.
+      let document: DocumentAttachment | null = null;
+      const filenameMatch = replyText.match(QUOTE_FILENAME_RE);
+      if (filenameMatch) {
+        const storeEntry = pdfStore.take(filenameMatch[0]);
         if (storeEntry) {
           document = {
             base64: storeEntry.pdfBase64,
             mimetype: "application/pdf",
             filename: storeEntry.filename,
           };
+        } else {
+          console.warn("[internal/message] PDF filename found in text but not in store:", filenameMatch[0]);
         }
-      } else {
-        // Clean up store entry if step extraction succeeded
-        pdfStore.take(pdfRequestId);
       }
 
       if (document) {
