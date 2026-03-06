@@ -117,6 +117,7 @@ export function createAdminController(
       }
       const user = await userManager.invite(parsed.data);
       return c.json(user, 201);
+      
     }
 
     // Password strategy: create with username + password
