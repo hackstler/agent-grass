@@ -16,10 +16,16 @@ function createDelegationTool(plugin: Plugin) {
     }),
     execute: async ({ query }, context) => {
       try {
-        // Generate WITHOUT memory — the coordinator already manages conversation memory.
         // Forward requestContext so sub-agent tools can read userId/orgId.
+        // Forward memory thread+resource so sub-agents with memory don't crash
+        // with "Thread ID is required" from Mastra's output processor.
+        const rc = context?.requestContext;
+        const threadId = rc?.get("conversationId") as string | undefined;
+        const resource = rc?.get("orgId") as string | undefined;
+
         const result = await plugin.agent.generate(query, {
-          ...(context?.requestContext && { requestContext: context.requestContext }),
+          ...(rc && { requestContext: rc }),
+          ...(threadId && { memory: { thread: threadId, resource: resource ?? "system" } }),
         });
 
         if (!result.text?.trim()) {

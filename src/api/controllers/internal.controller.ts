@@ -121,7 +121,7 @@ export function createInternalController(
         userId,
       );
 
-      const requestContext = new RequestContext([['userId', userId], ['orgId', orgId]]);
+      const requestContext = new RequestContext([['userId', userId], ['orgId', orgId], ['conversationId', conversationId]]);
 
       const result = await agent.generate(messageBody, {
         requestContext,
