@@ -10,6 +10,7 @@ import { DrizzleWhatsAppSessionRepository } from "./infrastructure/repositories/
 import { DrizzleTopicRepository } from "./infrastructure/repositories/drizzle-topic.repository.js";
 import { DrizzleOAuthTokenRepository } from "./infrastructure/repositories/drizzle-oauth-token.repository.js";
 import { DrizzleOrganizationRepository } from "./infrastructure/repositories/drizzle-organization.repository.js";
+import { DrizzleCatalogRepository } from "./infrastructure/repositories/drizzle-catalog.repository.js";
 
 // Application — managers
 import { UserManager } from "./application/managers/user.manager.js";
@@ -19,6 +20,7 @@ import { WhatsAppManager } from "./application/managers/whatsapp.manager.js";
 import { TopicManager } from "./application/managers/topic.manager.js";
 import { OrganizationManager } from "./application/managers/organization.manager.js";
 import { OAuthManager } from "./application/managers/oauth.manager.js";
+import { CatalogManager } from "./application/managers/catalog.manager.js";
 
 // Plugins
 import { PluginRegistry } from "./plugins/plugin-registry.js";
@@ -60,6 +62,7 @@ const sessionRepo = new DrizzleWhatsAppSessionRepository();
 const topicRepo = new DrizzleTopicRepository();
 const oauthTokenRepo = new DrizzleOAuthTokenRepository();
 const orgRepo = new DrizzleOrganizationRepository();
+const catalogRepo = new DrizzleCatalogRepository();
 
 // 2. Managers
 const userManager = new UserManager(userRepo, PASSWORD_SALT);
@@ -67,7 +70,8 @@ const docManager = new DocumentManager(docRepo);
 const convManager = new ConversationManager(convRepo);
 const waManager = new WhatsAppManager(sessionRepo, userRepo);
 const topicManager = new TopicManager(topicRepo);
-const orgManager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, orgRepo, PASSWORD_SALT);
+const orgManager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, orgRepo, catalogRepo, PASSWORD_SALT);
+const catalogManager = new CatalogManager(catalogRepo);
 const tokenEncryption = new AesTokenEncryption();
 const oauthManager = new OAuthManager(oauthTokenRepo, tokenEncryption);
 
@@ -103,6 +107,7 @@ const app = createApp({
   authConfig,
   authStrategy,
   oauthManager,
+  catalogManager,
 });
 
 // ── Startup ────────────────────────────────────────────────────────────────────

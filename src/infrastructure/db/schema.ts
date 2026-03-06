@@ -198,6 +198,7 @@ export const catalogs = pgTable("catalogs", {
   effectiveDate: timestamp("effective_date", { withTimezone: true }).notNull(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const catalogItems = pgTable(
@@ -209,13 +210,17 @@ export const catalogItems = pgTable(
       .references(() => catalogs.id, { onDelete: "cascade" }),
     code: integer("code").notNull(),
     name: text("name").notNull(),
+    description: text("description"),
+    category: text("category"),
     pricePerUnit: numeric("price_per_unit", { precision: 10, scale: 2 }).notNull(),
     unit: text("unit").notNull(),
     sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
     catalogIdx: index("catalog_items_catalog_id_idx").on(t.catalogId),
+    catalogCodeUq: uniqueIndex("catalog_items_catalog_code_uq").on(t.catalogId, t.code),
   })
 );
 

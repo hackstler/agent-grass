@@ -6,6 +6,7 @@ import {
   createMockTopicRepo,
   createMockSessionRepo,
   createMockOrgRepo,
+  createMockCatalogRepo,
   fakeUser,
   fakeOrganization,
 } from "../helpers/mock-repos.js";
@@ -17,6 +18,7 @@ describe("OrganizationManager", () => {
   let topicRepo: ReturnType<typeof createMockTopicRepo>;
   let sessionRepo: ReturnType<typeof createMockSessionRepo>;
   let orgRepo: ReturnType<typeof createMockOrgRepo>;
+  let catalogRepo: ReturnType<typeof createMockCatalogRepo>;
   let manager: OrganizationManager;
   const passwordSalt = "test-salt";
 
@@ -26,7 +28,8 @@ describe("OrganizationManager", () => {
     topicRepo = createMockTopicRepo();
     sessionRepo = createMockSessionRepo();
     orgRepo = createMockOrgRepo();
-    manager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, orgRepo, passwordSalt);
+    catalogRepo = createMockCatalogRepo();
+    manager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, orgRepo, catalogRepo, passwordSalt);
   });
 
   // ── list ───────────────────────────────────────────────────────────────────
@@ -187,6 +190,7 @@ describe("OrganizationManager", () => {
   describe("delete(orgId, callerOrgId)", () => {
     it("cascade-deletes all org resources including organizations row", async () => {
       userRepo.findFirstByOrg.mockResolvedValue(fakeUser({ orgId: "org-target" }));
+      catalogRepo.deleteByOrg.mockResolvedValue(undefined);
       docRepo.deleteByOrg.mockResolvedValue(undefined);
       topicRepo.deleteByOrg.mockResolvedValue(undefined);
       sessionRepo.deleteByOrgId.mockResolvedValue(undefined);
@@ -195,6 +199,7 @@ describe("OrganizationManager", () => {
 
       await expect(manager.delete("org-target", "org-caller")).resolves.toBeUndefined();
 
+      expect(catalogRepo.deleteByOrg).toHaveBeenCalledWith("org-target");
       expect(docRepo.deleteByOrg).toHaveBeenCalledWith("org-target");
       expect(topicRepo.deleteByOrg).toHaveBeenCalledWith("org-target");
       expect(sessionRepo.deleteByOrgId).toHaveBeenCalledWith("org-target");

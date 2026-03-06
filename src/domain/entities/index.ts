@@ -238,3 +238,55 @@ export interface NewOAuthToken {
   createdAt?: Date | undefined;
   updatedAt?: Date | undefined;
 }
+
+// ── Catalog ─────────────────────────────────────────────────────────────────
+
+export interface Catalog {
+  id: string;
+  orgId: string;
+  name: string;
+  effectiveDate: Date;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NewCatalog {
+  id?: string | undefined;
+  orgId: string;
+  name: string;
+  effectiveDate: Date;
+  isActive?: boolean | undefined;
+  createdAt?: Date | undefined;
+  updatedAt?: Date | undefined;
+}
+
+// ── CatalogItem ─────────────────────────────────────────────────────────────
+
+export interface CatalogItem {
+  id: string;
+  catalogId: string;
+  code: number;
+  name: string;
+  description: string | null;
+  category: string | null;
+  pricePerUnit: string;
+  unit: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface NewCatalogItem {
+  id?: string | undefined;
+  catalogId: string;
+  code: number;
+  name: string;
+  description?: string | null | undefined;
+  category?: string | null | undefined;
+  pricePerUnit: string;
+  unit: string;
+  sortOrder?: number | undefined;
+  isActive?: boolean | undefined;
+  createdAt?: Date | undefined;
+}

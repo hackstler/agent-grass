@@ -5,7 +5,8 @@ import type { ConversationRepository } from "../../domain/ports/repositories/con
 import type { TopicRepository } from "../../domain/ports/repositories/topic.repository.js";
 import type { WhatsAppSessionRepository } from "../../domain/ports/repositories/whatsapp-session.repository.js";
 import type { OrganizationRepository } from "../../domain/ports/repositories/organization.repository.js";
-import type { User, Conversation, Document, Topic, WhatsappSession, Organization } from "../../domain/entities/index.js";
+import type { CatalogRepository } from "../../domain/ports/repositories/catalog.repository.js";
+import type { User, Conversation, Document, Topic, WhatsappSession, Organization, Catalog, CatalogItem } from "../../domain/entities/index.js";
 
 // ── Mock repository factories ────────────────────────────────────────────────
 
@@ -177,6 +178,55 @@ export function fakeSession(overrides: Partial<WhatsappSession> = {}): WhatsappS
     qrData: null,
     phone: "+1234567890",
     updatedAt: new Date("2025-01-01"),
+    ...overrides,
+  };
+}
+
+export function createMockCatalogRepo(): {
+  [K in keyof CatalogRepository]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    findByOrgId: vi.fn(),
+    findByOrgAndId: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    deleteByOrg: vi.fn(),
+    findItemsByCatalog: vi.fn(),
+    findItemById: vi.fn(),
+    createItem: vi.fn(),
+    updateItem: vi.fn(),
+    deleteItem: vi.fn(),
+    nextCode: vi.fn(),
+  };
+}
+
+export function fakeCatalog(overrides: Partial<Catalog> = {}): Catalog {
+  return {
+    id: "cat-1",
+    orgId: "org-1",
+    name: "Default Catalog",
+    effectiveDate: new Date("2025-01-01"),
+    isActive: true,
+    createdAt: new Date("2025-01-01"),
+    updatedAt: new Date("2025-01-01"),
+    ...overrides,
+  };
+}
+
+export function fakeCatalogItem(overrides: Partial<CatalogItem> = {}): CatalogItem {
+  return {
+    id: "item-1",
+    catalogId: "cat-1",
+    code: 1,
+    name: "Product A",
+    description: null,
+    category: null,
+    pricePerUnit: "10.00",
+    unit: "m²",
+    sortOrder: 0,
+    isActive: true,
+    createdAt: new Date("2025-01-01"),
     ...overrides,
   };
 }

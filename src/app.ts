@@ -17,6 +17,7 @@ import type { PluginRegistry } from "./plugins/plugin-registry.js";
 import type { AuthConfig } from "./config/auth.config.js";
 import type { AuthStrategy } from "./domain/ports/auth-strategy.js";
 import type { OAuthManager } from "./application/managers/oauth.manager.js";
+import type { CatalogManager } from "./application/managers/catalog.manager.js";
 
 import { createAuthController } from "./api/controllers/auth.controller.js";
 import { createDocumentController } from "./api/controllers/document.controller.js";
@@ -26,6 +27,7 @@ import { createInternalController } from "./api/controllers/internal.controller.
 import { createAdminController } from "./api/controllers/admin.controller.js";
 import { createTopicController } from "./api/controllers/topic.controller.js";
 import { createOAuthController } from "./api/controllers/oauth.controller.js";
+import { createCatalogController } from "./api/controllers/catalog.controller.js";
 import health from "./api/health.js";
 
 export interface AppDependencies {
@@ -40,6 +42,7 @@ export interface AppDependencies {
   authConfig: AuthConfig;
   authStrategy: AuthStrategy | null;
   oauthManager?: OAuthManager;
+  catalogManager?: CatalogManager;
 }
 
 export function createApp(deps: AppDependencies): Hono {
@@ -97,6 +100,9 @@ export function createApp(deps: AppDependencies): Hono {
   app.use("/admin/*", auth);
   app.use("/admin/*", requireRole("admin"));
   app.route("/admin", createAdminController(deps.userManager, deps.orgManager, deps.authConfig));
+  if (deps.catalogManager) {
+    app.route("/admin/catalogs", createCatalogController(deps.catalogManager));
+  }
 
   // Internal worker endpoints — worker JWT auth
   const workerAuth = requireWorker();

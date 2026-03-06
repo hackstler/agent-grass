@@ -4,6 +4,7 @@ import type { DocumentRepository } from "../../domain/ports/repositories/documen
 import type { TopicRepository } from "../../domain/ports/repositories/topic.repository.js";
 import type { WhatsAppSessionRepository } from "../../domain/ports/repositories/whatsapp-session.repository.js";
 import type { OrganizationRepository } from "../../domain/ports/repositories/organization.repository.js";
+import type { CatalogRepository } from "../../domain/ports/repositories/catalog.repository.js";
 import type { Organization } from "../../domain/entities/index.js";
 import { NotFoundError, ConflictError, ValidationError, ForbiddenError } from "../../domain/errors/index.js";
 
@@ -50,6 +51,7 @@ export class OrganizationManager {
     private readonly topicRepo: TopicRepository,
     private readonly sessionRepo: WhatsAppSessionRepository,
     private readonly orgRepo: OrganizationRepository,
+    private readonly catalogRepo: CatalogRepository,
     private readonly passwordSalt: string,
   ) {}
 
@@ -139,6 +141,7 @@ export class OrganizationManager {
     if (!orgExists) throw new NotFoundError("Organization", orgId);
 
     // Cascade delete in order (documents cascade chunks via FK)
+    await this.catalogRepo.deleteByOrg(orgId);
     await this.docRepo.deleteByOrg(orgId);
     await this.topicRepo.deleteByOrg(orgId);
     await this.sessionRepo.deleteByOrgId(orgId);
