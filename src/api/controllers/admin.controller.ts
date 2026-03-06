@@ -5,6 +5,7 @@ import type { OrganizationManager } from "../../application/managers/organizatio
 import type { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
 import type { AuthConfig } from "../../config/auth.config.js";
 import type { TokenPayload } from "../middleware/auth.js";
+import { getPermissionScope, hasPermission, type Role } from "../../domain/permissions.js";
 
 const listUsersValidator = z.object({
   orgId: z.string().optional(),
@@ -52,9 +53,11 @@ const updateOrgValidator = z.object({
   metadata: z.record(z.unknown()).optional().nullable(),
 });
 
-function isSuperAdmin(caller: TokenPayload): boolean {
-  return caller.role === "super_admin";
-}
+const updateUserValidator = z.object({
+  email: z.string().email().max(255).optional(),
+  role: z.enum(["admin", "user", "super_admin"]).optional(),
+  password: z.string().min(8).optional(),
+});
 
 export function createAdminController(
   userManager: UserManager,
@@ -68,14 +71,19 @@ export function createAdminController(
 
   router.get("/users", async (c) => {
     const caller = c.get("user") as TokenPayload;
+    const scope = getPermissionScope(caller.role as Role, "view_org_users");
+    if (!scope) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
     const raw = listUsersValidator.parse(c.req.query());
     const filters: { orgId?: string; search?: string } = {};
 
-    if (isSuperAdmin(caller)) {
+    if (scope === "all") {
       // super_admin can filter by any orgId or see all
       if (raw.orgId) filters.orgId = raw.orgId;
     } else {
-      // org-scoped admin — always filter by own org
+      // own_org — always filter by own org
       filters.orgId = caller.orgId;
     }
     if (raw.search) filters.search = raw.search;
@@ -86,6 +94,11 @@ export function createAdminController(
 
   router.post("/users", async (c) => {
     const caller = c.get("user") as TokenPayload;
+    const scope = getPermissionScope(caller.role as Role, "create_org_users");
+    if (!scope) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
     const body = await c.req.json().catch(() => null);
 
     // Firebase strategy: invite by email (no password)
@@ -94,12 +107,12 @@ export function createAdminController(
       if (!parsed.success) {
         return c.json({ error: "Bad Request", message: parsed.error.message }, 400);
       }
-      // org-scoped admin can only invite to own org
-      if (!isSuperAdmin(caller) && parsed.data.orgId !== caller.orgId) {
+      // org-scoped: can only invite to own org
+      if (scope !== "all" && parsed.data.orgId !== caller.orgId) {
         return c.json({ error: "Forbidden", message: "Cannot invite users to other organizations" }, 403);
       }
       // Only super_admin can create super_admin users
-      if (parsed.data.role === "super_admin" && !isSuperAdmin(caller)) {
+      if (parsed.data.role === "super_admin" && caller.role !== "super_admin") {
         return c.json({ error: "Forbidden", message: "Only super_admin can assign super_admin role" }, 403);
       }
       const user = await userManager.invite(parsed.data);
@@ -111,21 +124,53 @@ export function createAdminController(
     if (!parsed.success) {
       return c.json({ error: "Bad Request", message: parsed.error.message }, 400);
     }
-    // org-scoped admin can only create users in own org
-    if (!isSuperAdmin(caller) && parsed.data.orgId !== caller.orgId) {
+    // org-scoped: can only create users in own org
+    if (scope !== "all" && parsed.data.orgId !== caller.orgId) {
       return c.json({ error: "Forbidden", message: "Cannot create users in other organizations" }, 403);
     }
     // Only super_admin can create super_admin users
-    if (parsed.data.role === "super_admin" && !isSuperAdmin(caller)) {
+    if (parsed.data.role === "super_admin" && caller.role !== "super_admin") {
       return c.json({ error: "Forbidden", message: "Only super_admin can assign super_admin role" }, 403);
     }
     const user = await userManager.create(parsed.data);
     return c.json(user, 201);
   });
 
+  router.patch("/users/:id", async (c) => {
+    const caller = c.get("user") as TokenPayload;
+    const id = c.req.param("id");
+
+    const body = await c.req.json().catch(() => null);
+    const parsed = updateUserValidator.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: "Bad Request", message: parsed.error.message }, 400);
+    }
+
+    try {
+      const updated = await userManager.update(id, parsed.data, caller.role, caller.orgId);
+      return c.json(updated);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Update failed";
+      if (message === "Forbidden" || message === "Only super_admin can assign super_admin role") {
+        return c.json({ error: "Forbidden", message }, 403);
+      }
+      if (message === "User not found") {
+        return c.json({ error: "NotFound", message }, 404);
+      }
+      if (message === "Email already in use") {
+        return c.json({ error: "Conflict", message }, 409);
+      }
+      return c.json({ error: "InternalError", message }, 500);
+    }
+  });
+
   router.delete("/users/:id", async (c) => {
     const id = c.req.param("id");
     const caller = c.get("user") as TokenPayload;
+    const scope = getPermissionScope(caller.role as Role, "delete_org_users");
+    if (!scope) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
     await userManager.delete(id, caller.userId);
     return c.json({ ok: true });
   });
@@ -134,11 +179,19 @@ export function createAdminController(
 
   router.get("/organizations", async (c) => {
     const caller = c.get("user") as TokenPayload;
-    if (isSuperAdmin(caller)) {
+
+    // super_admin can see all orgs
+    if (hasPermission(caller.role as Role, "view_all_orgs")) {
       const items = await orgManager.list();
       return c.json({ items });
     }
-    // org-scoped admin: only own org
+
+    // admin/user with view_own_org: only own org
+    const scope = getPermissionScope(caller.role as Role, "view_own_org");
+    if (!scope) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
     try {
       const org = await orgManager.getByOrgId(caller.orgId);
       return c.json({ items: [org] });
@@ -150,8 +203,12 @@ export function createAdminController(
   router.get("/organizations/:orgId", async (c) => {
     const orgId = c.req.param("orgId");
     const caller = c.get("user") as TokenPayload;
-    // org-scoped admin can only view own org
-    if (!isSuperAdmin(caller) && orgId !== caller.orgId) {
+    const scope = getPermissionScope(caller.role as Role, "view_own_org");
+    if (!scope) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+    // non-"all" scope can only view own org
+    if (scope !== "all" && orgId !== caller.orgId) {
       return c.json({ error: "Forbidden", message: "Cannot view other organizations" }, 403);
     }
     const org = await orgManager.getByOrgId(orgId);
@@ -160,7 +217,7 @@ export function createAdminController(
 
   router.post("/organizations", async (c) => {
     const caller = c.get("user") as TokenPayload;
-    if (!isSuperAdmin(caller)) {
+    if (!hasPermission(caller.role as Role, "create_org")) {
       return c.json({ error: "Forbidden", message: "Only super_admin can create organizations" }, 403);
     }
     const body = await c.req.json().catch(() => null);
@@ -179,8 +236,12 @@ export function createAdminController(
   router.put("/organizations/:orgId", async (c) => {
     const orgId = c.req.param("orgId");
     const caller = c.get("user") as TokenPayload;
-    // org-scoped admin can only update own org
-    if (!isSuperAdmin(caller) && orgId !== caller.orgId) {
+    const scope = getPermissionScope(caller.role as Role, "edit_own_org");
+    if (!scope) {
+      return c.json({ error: "Forbidden", message: "Cannot update organizations" }, 403);
+    }
+    // non-"all" scope can only update own org
+    if (scope !== "all" && orgId !== caller.orgId) {
       return c.json({ error: "Forbidden", message: "Cannot update other organizations" }, 403);
     }
     const body = await c.req.json().catch(() => null);
@@ -199,7 +260,7 @@ export function createAdminController(
 
   router.delete("/organizations/:orgId", async (c) => {
     const caller = c.get("user") as TokenPayload;
-    if (!isSuperAdmin(caller)) {
+    if (!hasPermission(caller.role as Role, "delete_org")) {
       return c.json({ error: "Forbidden", message: "Only super_admin can delete organizations" }, 403);
     }
     const orgId = c.req.param("orgId");
@@ -211,13 +272,21 @@ export function createAdminController(
 
   router.get("/whatsapp/sessions", async (c) => {
     const caller = c.get("user") as TokenPayload;
-    const items = isSuperAdmin(caller)
+    const scope = getPermissionScope(caller.role as Role, "view_whatsapp_mgmt");
+    if (!scope) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+    const items = scope === "all"
       ? await waManager.listAllSessions()
       : await waManager.listSessionsByOrg(caller.orgId);
     return c.json({ items, total: items.length });
   });
 
   router.post("/whatsapp/sessions/:userId/revoke", async (c) => {
+    const caller = c.get("user") as TokenPayload;
+    if (!hasPermission(caller.role as Role, "revoke_whatsapp")) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
     const userId = c.req.param("userId");
     await waManager.disconnectForUser(userId);
     return c.json({ ok: true });

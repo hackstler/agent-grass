@@ -229,13 +229,10 @@ describe("Admin API", () => {
     expect(body.items).toBeDefined();
   });
 
-  it("GET /admin/whatsapp/sessions scopes by org for org-admin", async () => {
-    ctx.repos.session.findAllWithUserByOrg.mockResolvedValue([]);
-
+  it("GET /admin/whatsapp/sessions returns 403 for org-admin (no view_whatsapp_mgmt permission)", async () => {
     const res = await ctx.app.request("/admin/whatsapp/sessions", { headers: orgAdminHeaders });
 
-    expect(res.status).toBe(200);
-    expect(ctx.repos.session.findAllWithUserByOrg).toHaveBeenCalledWith("org-1");
+    expect(res.status).toBe(403);
   });
 
   it("POST /admin/whatsapp/sessions/:userId/revoke disconnects session", async () => {
@@ -250,14 +247,77 @@ describe("Admin API", () => {
     expect(res.status).toBe(200);
   });
 
-  // ── Role guard ────────────────────────────────────────────────────────────────
+  // ── PATCH /admin/users/:id ──────────────────────────────────────────────────
 
-  it("returns 403 for regular user accessing admin endpoints", async () => {
+  it("PATCH /admin/users/:id returns 200 on success for super_admin", async () => {
+    const existing = fakeUser({ id: "u-2", email: "bob", orgId: "org-1", role: "user" });
+    const updated = fakeUser({ id: "u-2", email: "bob-new@test.com", orgId: "org-1", role: "user" });
+    ctx.repos.user.findById.mockResolvedValue(existing);
+    ctx.repos.user.findByEmail.mockResolvedValue(null);
+    ctx.repos.user.update.mockResolvedValue(updated);
+
+    const res = await ctx.app.request("/admin/users/u-2", {
+      method: "PATCH",
+      headers: superAdminHeaders,
+      body: JSON.stringify({ email: "bob-new@test.com" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.email).toBe("bob-new@test.com");
+  });
+
+  it("PATCH /admin/users/:id returns 403 for user role", async () => {
+    const userHeaders = {
+      "Content-Type": "application/json",
+      ...createAuthHeaders({ userId: "u-3", username: "alice", orgId: "org-1", role: "user" }),
+    };
+
+    const res = await ctx.app.request("/admin/users/u-2", {
+      method: "PATCH",
+      headers: userHeaders,
+      body: JSON.stringify({ email: "new@test.com" }),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("PATCH /admin/users/:id returns 404 when user not found", async () => {
+    ctx.repos.user.findById.mockResolvedValue(null);
+
+    const res = await ctx.app.request("/admin/users/u-999", {
+      method: "PATCH",
+      headers: superAdminHeaders,
+      body: JSON.stringify({ email: "new@test.com" }),
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  // ── Permission guards ─────────────────────────────────────────────────────
+
+  it("returns 403 for regular user accessing /admin/users", async () => {
     const userHeaders = {
       ...createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "user" }),
     };
 
     const res = await ctx.app.request("/admin/users", { headers: userHeaders });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 for regular user accessing /documents", async () => {
+    const userHeaders = {
+      ...createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "user" }),
+    };
+
+    const res = await ctx.app.request("/documents", { headers: userHeaders });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 for admin accessing /admin/whatsapp/sessions", async () => {
+    const res = await ctx.app.request("/admin/whatsapp/sessions", { headers: orgAdminHeaders });
 
     expect(res.status).toBe(403);
   });

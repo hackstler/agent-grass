@@ -5,6 +5,11 @@ import type { AuthConfig } from "../../config/auth.config.js";
 import type { AuthStrategy } from "../../domain/ports/auth-strategy.js";
 import { issueToken, type TokenPayload } from "../middleware/auth.js";
 
+const updateProfileValidator = z.object({
+  email: z.string().email().max(255).optional(),
+  password: z.string().min(8).optional(),
+});
+
 const registerValidator = z.object({
   username: z.string().min(3).max(50),
   password: z.string().min(8),
@@ -131,6 +136,36 @@ export function createAuthController(
       orgId: user.orgId,
       role: user.role,
     });
+  });
+
+  /**
+   * PATCH /auth/profile
+   * Update the authenticated user's own profile (email and/or password).
+   * Requires authMiddleware() — any authenticated user can update themselves.
+   */
+  router.patch("/profile", async (c) => {
+    const user = c.get("user") as TokenPayload | undefined;
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+
+    const body = await c.req.json().catch(() => null);
+    const parsed = updateProfileValidator.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: "Bad Request", message: parsed.error.message }, 400);
+    }
+
+    try {
+      const updated = await manager.updateSelf(user.userId, parsed.data);
+      return c.json({ data: updated });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Update failed";
+      if (message === "User not found") {
+        return c.json({ error: "NotFound", message }, 404);
+      }
+      if (message === "Email already in use") {
+        return c.json({ error: "Conflict", message }, 409);
+      }
+      return c.json({ error: "InternalError", message }, 500);
+    }
   });
 
   return router;

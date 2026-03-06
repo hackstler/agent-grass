@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
-import { authMiddleware, optionalAuth, requireRole, requireWorker } from "./api/middleware/auth.js";
+import { authMiddleware, optionalAuth, requireRole, requirePermission, requireWorker } from "./api/middleware/auth.js";
 import { errorHandler, domainErrorToHttpStatus } from "./api/middleware/error-handler.middleware.js";
 import { DomainError } from "./domain/errors/index.js";
 
@@ -66,6 +66,7 @@ export function createApp(deps: AppDependencies): Hono {
 
   const auth = authMiddleware();
   app.use("/auth/me", auth);
+  app.use("/auth/profile", auth);
   app.use("/auth/register", optionalAuth());
   // OAuth routes: authorize, status, disconnect require auth; callback does NOT (Google redirect)
   app.use("/auth/google/authorize", auth);
@@ -78,10 +79,13 @@ export function createApp(deps: AppDependencies): Hono {
 
   // Auth middleware BEFORE plugin routes (plugins mount /chat, /ingest, etc.)
   app.use("/ingest/*", auth);
+  app.use("/ingest/*", requirePermission("manage_knowledge"));
   app.use("/chat/*", auth);
   app.use("/conversations/*", auth);
   app.use("/topics/*", auth);
+  app.use("/topics/*", requirePermission("view_knowledge"));
   app.use("/documents/*", auth);
+  app.use("/documents/*", requirePermission("view_knowledge"));
 
   // ── Plugin routes (after auth middleware) ──────────────────────────────────
   if (deps.pluginRegistry) {
@@ -108,11 +112,14 @@ export function createApp(deps: AppDependencies): Hono {
     }
   });
 
-  // Admin endpoints — require admin role
+  // Admin endpoints — granular permission guards per route group
   app.use("/admin/*", auth);
-  app.use("/admin/*", requireRole("admin", "super_admin"));
+  app.use("/admin/users/*", requirePermission("view_org_users"));
+  app.use("/admin/organizations/*", requirePermission("view_own_org"));
+  app.use("/admin/whatsapp/*", requirePermission("view_whatsapp_mgmt"));
   app.route("/admin", createAdminController(deps.userManager, deps.orgManager, deps.authConfig, deps.waManager));
   if (deps.catalogManager) {
+    app.use("/admin/catalogs/*", requirePermission("manage_catalogs"));
     app.route("/admin/catalogs", createCatalogController(deps.catalogManager));
   }
 

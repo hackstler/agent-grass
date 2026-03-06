@@ -11,7 +11,7 @@ vi.mock("../../infrastructure/db/client.js", () => ({
 import { createTestApp, createAuthHeaders, type TestContext } from "../helpers/test-app.js";
 import { fakeDocument } from "../helpers/mock-repos.js";
 
-const AUTH = createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "user" });
+const AUTH = createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "admin" });
 
 describe("Documents API", () => {
   let ctx: TestContext;

@@ -15,6 +15,7 @@ export interface UserRepository {
   count(): Promise<number>;
   countByOrg(): Promise<OrgUserCount[]>;
   create(data: NewUser): Promise<User>;
+  update(id: string, data: Partial<Omit<NewUser, "orgId">>): Promise<User | null>;
   delete(id: string): Promise<boolean>;
   deleteByOrg(orgId: string): Promise<void>;
 }

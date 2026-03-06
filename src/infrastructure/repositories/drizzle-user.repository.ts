@@ -71,6 +71,11 @@ export class DrizzleUserRepository implements UserRepository {
     }));
   }
 
+  async update(id: string, data: Partial<Omit<NewUser, "orgId">>): Promise<User | null> {
+    const result = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return result[0] ?? null;
+  }
+
   async delete(id: string): Promise<boolean> {
     const result = await db.delete(users).where(eq(users.id, id)).returning({ id: users.id });
     return result.length > 0;

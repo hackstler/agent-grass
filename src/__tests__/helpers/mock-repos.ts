@@ -22,6 +22,7 @@ export function createMockUserRepo(): {
     count: vi.fn(),
     countByOrg: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
     delete: vi.fn(),
     deleteByOrg: vi.fn(),
   };

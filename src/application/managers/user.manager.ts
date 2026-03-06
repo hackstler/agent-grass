@@ -8,6 +8,7 @@ import {
   ForbiddenError,
   ValidationError,
 } from "../../domain/errors/index.js";
+import { getPermissionScope, type Role } from "../../domain/permissions.js";
 
 export interface RegisterUserDto {
   username: string;
@@ -27,6 +28,12 @@ export interface InviteUserDto {
   email: string;
   orgId: string;
   role?: "admin" | "user" | "super_admin";
+}
+
+export interface UpdateUserDto {
+  email?: string | undefined;
+  role?: "admin" | "user" | "super_admin" | undefined;
+  password?: string | undefined;
 }
 
 export interface UserListItem {
@@ -159,6 +166,90 @@ export class UserManager {
       orgId: user.orgId,
       role,
       createdAt: user.createdAt.toISOString(),
+    };
+  }
+
+  async update(
+    id: string,
+    dto: UpdateUserDto,
+    callerRole: string,
+    callerOrgId: string,
+  ): Promise<UserListItem> {
+    const scope = getPermissionScope(callerRole as Role, "edit_org_users");
+    if (!scope) throw new Error("Forbidden");
+
+    const existingUser = await this.repo.findById(id);
+    if (!existingUser) throw new Error("User not found");
+
+    // Org scoping
+    if (scope === "own_org" && existingUser.orgId !== callerOrgId) {
+      throw new Error("Forbidden");
+    }
+
+    // Only super_admin can assign super_admin role
+    if (dto.role === "super_admin" && callerRole !== "super_admin") {
+      throw new Error("Only super_admin can assign super_admin role");
+    }
+
+    // Email conflict check
+    if (dto.email && dto.email !== existingUser.email) {
+      const existing = await this.repo.findByEmail(dto.email);
+      if (existing) throw new Error("Email already in use");
+    }
+
+    // Build update payload
+    const updateData: Record<string, unknown> = {};
+    if (dto.email) updateData["email"] = dto.email;
+    if (dto.role) updateData["role"] = dto.role;
+    if (dto.password) {
+      updateData["metadata"] = {
+        ...(existingUser.metadata ?? {}),
+        passwordHash: this.hashPassword(dto.password),
+      };
+    }
+
+    const updated = await this.repo.update(id, updateData);
+    if (!updated) throw new Error("Update failed");
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      orgId: updated.orgId,
+      role: updated.role,
+      createdAt: updated.createdAt.toISOString(),
+    };
+  }
+
+  async updateSelf(
+    userId: string,
+    dto: { email?: string | undefined; password?: string | undefined },
+  ): Promise<UserListItem> {
+    const existingUser = await this.repo.findById(userId);
+    if (!existingUser) throw new Error("User not found");
+
+    if (dto.email && dto.email !== existingUser.email) {
+      const existing = await this.repo.findByEmail(dto.email);
+      if (existing) throw new Error("Email already in use");
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (dto.email) updateData["email"] = dto.email;
+    if (dto.password) {
+      updateData["metadata"] = {
+        ...(existingUser.metadata ?? {}),
+        passwordHash: this.hashPassword(dto.password),
+      };
+    }
+
+    const updated = await this.repo.update(userId, updateData);
+    if (!updated) throw new Error("Update failed");
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      orgId: updated.orgId,
+      role: updated.role,
+      createdAt: updated.createdAt.toISOString(),
     };
   }
 

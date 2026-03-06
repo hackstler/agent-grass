@@ -2,6 +2,7 @@ import type { MiddlewareHandler, Context } from "hono";
 import jwt from "jsonwebtoken";
 const { sign, verify } = jwt;
 import type { JwtPayload } from "jsonwebtoken";
+import { hasPermission, type Permission, type Role } from "../../domain/permissions.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -130,6 +131,27 @@ export function requireRole(...roles: Array<"admin" | "user" | "super_admin">): 
       return;
     }
     return c.json({ error: "Forbidden", message: `Requires role: ${roles.join(" or ")}` }, 403);
+  };
+}
+
+// ── requirePermission guard ────────────────────────────────────────────────────
+
+/**
+ * Use after authMiddleware() to restrict an endpoint to users who hold
+ * at least one of the listed permissions (OR logic).
+ * Example: app.get("/admin/users", authMiddleware(), requirePermission("view_org_users"), handler)
+ */
+export function requirePermission(...permissions: Permission[]): MiddlewareHandler {
+  return async (c: Context, next) => {
+    const user = c.get("user");
+    if (!user) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    const hasAny = permissions.some((p) => hasPermission(user.role as Role, p));
+    if (!hasAny) {
+      return c.json({ error: "Forbidden", message: `Requires permission: ${permissions.join(" or ")}` }, 403);
+    }
+    await next();
   };
 }
 
