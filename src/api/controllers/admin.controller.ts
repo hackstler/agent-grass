@@ -158,12 +158,20 @@ export function createAdminController(
       return c.json({ error: "Bad Request", message: parsed.error.message }, 400);
     }
 
+    // Reject password update in firebase mode
+    if (parsed.data.password && authConfig.strategy === "firebase") {
+      return c.json(
+        { error: "Forbidden", message: "Password management is not available with Firebase authentication" },
+        403,
+      );
+    }
+
     try {
       const updated = await userManager.update(id, parsed.data, caller.role, caller.orgId);
       return c.json(updated);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Update failed";
-      if (message === "Forbidden" || message === "Only super_admin can assign super_admin role") {
+      if (message === "Forbidden" || message === "Only super_admin can assign super_admin role" || message.includes("Password management")) {
         return c.json({ error: "Forbidden", message }, 403);
       }
       if (message === "User not found") {

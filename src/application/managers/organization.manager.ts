@@ -1,10 +1,10 @@
-import { createHash } from "crypto";
 import type { UserRepository } from "../../domain/ports/repositories/user.repository.js";
 import type { DocumentRepository } from "../../domain/ports/repositories/document.repository.js";
 import type { TopicRepository } from "../../domain/ports/repositories/topic.repository.js";
 import type { WhatsAppSessionRepository } from "../../domain/ports/repositories/whatsapp-session.repository.js";
 import type { OrganizationRepository } from "../../domain/ports/repositories/organization.repository.js";
 import type { CatalogRepository } from "../../domain/ports/repositories/catalog.repository.js";
+import type { AuthStrategy } from "../../domain/ports/auth-strategy.js";
 import type { Organization } from "../../domain/entities/index.js";
 import { NotFoundError, ConflictError, ValidationError, ForbiddenError } from "../../domain/errors/index.js";
 
@@ -52,12 +52,8 @@ export class OrganizationManager {
     private readonly sessionRepo: WhatsAppSessionRepository,
     private readonly orgRepo: OrganizationRepository,
     private readonly catalogRepo: CatalogRepository,
-    private readonly passwordSalt: string,
+    private readonly strategy: AuthStrategy,
   ) {}
-
-  private hashPassword(password: string): string {
-    return createHash("sha256").update(`${this.passwordSalt}:${password}`).digest("hex");
-  }
 
   async list(): Promise<OrgSummary[]> {
     const userCounts = await this.userRepo.countByOrg();
@@ -117,7 +113,7 @@ export class OrganizationManager {
       email: dto.adminUsername,
       orgId: dto.orgId,
       role: "admin",
-      metadata: { passwordHash: this.hashPassword(dto.adminPassword) },
+      metadata: { passwordHash: this.strategy.hashPassword!(dto.adminPassword) },
     });
 
     return {

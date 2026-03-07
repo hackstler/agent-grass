@@ -1,6 +1,6 @@
-import { createHash } from "crypto";
 import type { User } from "../../domain/entities/index.js";
 import type { UserRepository } from "../../domain/ports/repositories/user.repository.js";
+import type { AuthStrategy } from "../../domain/ports/auth-strategy.js";
 import {
   NotFoundError,
   ConflictError,
@@ -41,7 +41,6 @@ export interface RegisterWithInviteDto {
   lastName?: string | undefined;
   orgId: string;
   role: string;
-  authStrategy: "password" | "firebase";
 }
 
 export interface UpdateUserDto {
@@ -65,12 +64,8 @@ export interface UserListItem {
 export class UserManager {
   constructor(
     private readonly repo: UserRepository,
-    private readonly passwordSalt: string,
+    private readonly strategy: AuthStrategy,
   ) {}
-
-  private hashPassword(password: string): string {
-    return createHash("sha256").update(`${this.passwordSalt}:${password}`).digest("hex");
-  }
 
   async register(
     dto: RegisterUserDto,
@@ -93,7 +88,7 @@ export class UserManager {
       surname: dto.surname ?? null,
       orgId: dto.orgId ?? dto.email,
       role,
-      metadata: { passwordHash: this.hashPassword(dto.password) },
+      metadata: { passwordHash: this.strategy.hashPassword!(dto.password) },
     });
 
     return { user, role };
@@ -103,14 +98,9 @@ export class UserManager {
     email: string,
     password: string,
   ): Promise<{ user: User; role: "admin" | "user" | "super_admin" }> {
-    const user = await this.repo.findByEmail(email);
+    const result = await this.strategy.authenticate({ type: "password", email, password });
+    const user = await this.repo.findByEmail(result.email);
     if (!user) throw new UnauthorizedError("Invalid credentials");
-
-    const meta = user.metadata as { passwordHash?: string } | null;
-    if (!meta?.passwordHash || meta.passwordHash !== this.hashPassword(password)) {
-      throw new UnauthorizedError("Invalid credentials");
-    }
-
     return { user, role: user.role };
   }
 
@@ -144,7 +134,7 @@ export class UserManager {
       surname: dto.surname ?? null,
       orgId: dto.orgId,
       role,
-      metadata: { passwordHash: this.hashPassword(dto.password) },
+      metadata: { passwordHash: this.strategy.hashPassword!(dto.password) },
     });
 
     return {
@@ -225,6 +215,11 @@ export class UserManager {
       if (existing) throw new Error("Email already in use");
     }
 
+    // Reject password update in firebase mode
+    if (dto.password && !this.strategy.supportsPasswordManagement()) {
+      throw new ForbiddenError("Password management is not available with Firebase authentication");
+    }
+
     // Build update payload
     const updateData: Record<string, unknown> = {};
     if (dto.email) updateData["email"] = dto.email;
@@ -234,7 +229,7 @@ export class UserManager {
     if (dto.password) {
       updateData["metadata"] = {
         ...(existingUser.metadata ?? {}),
-        passwordHash: this.hashPassword(dto.password),
+        passwordHash: this.strategy.hashPassword!(dto.password),
       };
     }
 
@@ -258,13 +253,13 @@ export class UserManager {
 
     const role = (dto.role as "admin" | "user" | "super_admin") ?? "user";
     const metadata: Record<string, unknown> = {
-      authStrategy: dto.authStrategy,
+      authStrategy: this.strategy.name,
       onboardingComplete: false,
     };
     if (dto.firstName) metadata["firstName"] = dto.firstName;
     if (dto.lastName) metadata["lastName"] = dto.lastName;
-    if (dto.password && dto.authStrategy === "password") {
-      metadata["passwordHash"] = this.hashPassword(dto.password);
+    if (dto.password && this.strategy.supportsPasswordManagement()) {
+      metadata["passwordHash"] = this.strategy.hashPassword!(dto.password);
     }
 
     const user = await this.repo.create({
@@ -299,6 +294,11 @@ export class UserManager {
       if (existing) throw new Error("Email already in use");
     }
 
+    // Reject password update in firebase mode
+    if (dto.password && !this.strategy.supportsPasswordManagement()) {
+      throw new ForbiddenError("Password management is not available with Firebase authentication");
+    }
+
     const updateData: Record<string, unknown> = {};
     if (dto.email) updateData["email"] = dto.email;
     if (dto.name !== undefined) updateData["name"] = dto.name;
@@ -306,7 +306,7 @@ export class UserManager {
 
     // Merge metadata fields
     const metadataUpdates: Record<string, unknown> = {};
-    if (dto.password) metadataUpdates["passwordHash"] = this.hashPassword(dto.password);
+    if (dto.password) metadataUpdates["passwordHash"] = this.strategy.hashPassword!(dto.password);
     if (dto.onboardingComplete !== undefined) metadataUpdates["onboardingComplete"] = dto.onboardingComplete;
     if (dto.firstName !== undefined) metadataUpdates["firstName"] = dto.firstName;
     if (dto.lastName !== undefined) metadataUpdates["lastName"] = dto.lastName;

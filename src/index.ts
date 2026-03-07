@@ -50,9 +50,6 @@ import { createApp } from "./app.js";
 
 // ── Composition root ───────────────────────────────────────────────────────────
 
-// Auth strategy (firebase or null for password)
-const authStrategy = createAuthStrategy(authConfig);
-
 // Password salt — same secret used for JWT signing (stable across restarts)
 const PASSWORD_SALT = process.env["JWT_SECRET"] ?? "default-salt";
 
@@ -67,19 +64,22 @@ const orgRepo = new DrizzleOrganizationRepository();
 const catalogRepo = new DrizzleCatalogRepository();
 const invitationRepo = new DrizzleInvitationRepository();
 
-// 2. Managers
-const userManager = new UserManager(userRepo, PASSWORD_SALT);
+// 2. Auth strategy (firebase or password — always non-null)
+const authStrategy = createAuthStrategy(authConfig, PASSWORD_SALT, userRepo);
+
+// 3. Managers
+const userManager = new UserManager(userRepo, authStrategy);
 const docManager = new DocumentManager(docRepo);
 const convManager = new ConversationManager(convRepo);
 const waManager = new WhatsAppManager(sessionRepo, userRepo);
 const topicManager = new TopicManager(topicRepo);
-const orgManager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, orgRepo, catalogRepo, PASSWORD_SALT);
+const orgManager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, orgRepo, catalogRepo, authStrategy);
 const catalogManager = new CatalogManager(catalogRepo);
 const invitationManager = new InvitationManager(invitationRepo, orgRepo, PASSWORD_SALT);
 const tokenEncryption = new AesTokenEncryption();
 const oauthManager = new OAuthManager(oauthTokenRepo, tokenEncryption);
 
-// 3. Plugin registry
+// 4. Plugin registry
 const pluginRegistry = new PluginRegistry();
 const ragPlugin = new RagPlugin();
 pluginRegistry.register(ragPlugin);
@@ -91,14 +91,14 @@ pluginRegistry.register(new GmailPlugin(oauthProvider, attachmentStore));
 pluginRegistry.register(new CalendarPlugin(oauthProvider));
 pluginRegistry.register(new QuotePlugin({ attachmentStore, organizationRepo: orgRepo }));
 
-// 4. Coordinator agent (uses all plugin tools)
+// 5. Coordinator agent (uses all plugin tools)
 const coordinatorAgent = createCoordinatorAgent(pluginRegistry);
 
 // Wire coordinator + convManager into RAG plugin so /chat uses coordinator (enables Gmail/Calendar from dashboard)
 ragPlugin.setCoordinatorAgent(coordinatorAgent);
 ragPlugin.setConversationManager(convManager);
 
-// 5. Create app
+// 6. Create app
 const app = createApp({
   userManager,
   docManager,

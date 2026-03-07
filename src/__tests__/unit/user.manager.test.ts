@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createHash } from "crypto";
 import { UserManager } from "../../application/managers/user.manager.js";
+import { PasswordStrategy } from "../../infrastructure/auth/password.strategy.js";
 import { createMockUserRepo, fakeUser } from "../helpers/mock-repos.js";
 import {
   NotFoundError,
@@ -22,7 +23,8 @@ describe("UserManager", () => {
 
   beforeEach(() => {
     repo = createMockUserRepo();
-    manager = new UserManager(repo, SALT);
+    const strategy = new PasswordStrategy(SALT, repo);
+    manager = new UserManager(repo, strategy);
   });
 
   // ── register ────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import type { InvitationManager } from "../../application/managers/invitation.ma
 import type { AuthConfig } from "../../config/auth.config.js";
 import type { AuthStrategy } from "../../domain/ports/auth-strategy.js";
 import { issueToken, type TokenPayload } from "../middleware/auth.js";
+import { ForbiddenError } from "../../domain/errors/index.js";
 
 const updateProfileValidator = z.object({
   email: z.string().email().max(255).optional(),
@@ -46,7 +47,7 @@ const firebaseLoginValidator = z.object({
 export function createAuthController(
   manager: UserManager,
   authConfig: AuthConfig,
-  strategy: AuthStrategy | null,
+  strategy: AuthStrategy,
   invitationManager?: InvitationManager,
 ): Hono {
   const router = new Hono();
@@ -89,23 +90,22 @@ export function createAuthController(
 
   /**
    * POST /auth/login
-   * - password strategy: { email, password } → JWT
-   * - firebase strategy: { idToken } → verify Firebase token → JWT
+   * Mutually exclusive strategies:
+   *   - firebase: only accepts { idToken }
+   *   - password: only accepts { email, password }
    */
   router.post("/login", async (c) => {
     const body = await c.req.json().catch(() => null);
+    if (!body) return c.json({ error: "Bad Request" }, 400);
 
-    // Firebase strategy: verify ID token, find user by email, issue local JWT
-    if (authConfig.strategy === "firebase" && strategy) {
+    if (authConfig.strategy === "firebase") {
+      // Firebase strategy: only accept idToken
       const parsed = firebaseLoginValidator.safeParse(body);
       if (!parsed.success) {
-        return c.json(
-          { error: "Validation", message: "Body must contain { idToken: string }" },
-          400,
-        );
+        return c.json({ error: "Bad Request", message: "Firebase login requires idToken" }, 400);
       }
 
-      const authResult = await strategy.verifyToken(parsed.data.idToken);
+      const authResult = await strategy.authenticate({ type: "token", token: parsed.data.idToken });
       const found = await manager.findByEmailWithRole(authResult.email);
       if (!found) {
         return c.json(
@@ -126,10 +126,10 @@ export function createAuthController(
       });
     }
 
-    // Password strategy: existing flow
+    // Password strategy: only accept email + password
     const parsed = passwordLoginValidator.safeParse(body);
     if (!parsed.success) {
-      return c.json({ error: "Bad Request" }, 400);
+      return c.json({ error: "Bad Request", message: "Password login requires email and password" }, 400);
     }
 
     const { user, role } = await manager.login(parsed.data.email, parsed.data.password);
@@ -144,6 +144,8 @@ export function createAuthController(
   /**
    * POST /auth/register-with-invite
    * Public endpoint. Registers a new user using an invitation token.
+   *   - firebase: requires idToken (password goes to Firebase, never our backend)
+   *   - password: requires email + password
    */
   router.post("/register-with-invite", async (c) => {
     if (!invitationManager) {
@@ -167,18 +169,20 @@ export function createAuthController(
 
     // Determine email based on auth strategy
     let email: string;
-    let authStrategy: "password" | "firebase" = "password";
 
-    if (idToken && strategy) {
-      // Firebase: verify the ID token
-      const authResult = await strategy.verifyToken(idToken);
+    if (authConfig.strategy === "firebase") {
+      // Firebase: requires idToken
+      if (!idToken) {
+        return c.json({ error: "Bad Request", message: "Firebase registration requires idToken" }, 400);
+      }
+      const authResult = await strategy.authenticate({ type: "token", token: idToken });
       email = authResult.email;
-      authStrategy = "firebase";
-    } else if (bodyEmail && password) {
-      email = bodyEmail;
-      authStrategy = "password";
     } else {
-      return c.json({ error: "Bad Request", message: "Provide either idToken (Firebase) or email+password" }, 400);
+      // Password: requires email + password
+      if (!bodyEmail || !password) {
+        return c.json({ error: "Bad Request", message: "Password registration requires email and password" }, 400);
+      }
+      email = bodyEmail;
     }
 
     // If invitation has email hint, verify it matches
@@ -189,12 +193,11 @@ export function createAuthController(
     // Create user
     const { user, role } = await manager.registerWithInvite({
       email,
-      password,
+      password: authConfig.strategy === "password" ? password : undefined,
       firstName,
       lastName,
       orgId: validation.orgId,
       role: validation.role,
-      authStrategy,
     });
 
     // Mark invitation as used
@@ -278,6 +281,14 @@ export function createAuthController(
       return c.json({ error: "Bad Request", message: parsed.error.message }, 400);
     }
 
+    // Reject password change in firebase mode
+    if (parsed.data.password && !strategy.supportsPasswordManagement()) {
+      return c.json(
+        { error: "Forbidden", message: "Password management is not available with Firebase authentication" },
+        403,
+      );
+    }
+
     try {
       const { onboardingComplete, firstName, lastName, ...rest } = parsed.data;
       const updated = await manager.updateSelf(user.userId, {
@@ -288,6 +299,9 @@ export function createAuthController(
       });
       return c.json({ data: updated });
     } catch (err) {
+      if (err instanceof ForbiddenError) {
+        return c.json({ error: "Forbidden", message: err.message }, 403);
+      }
       const message = err instanceof Error ? err.message : "Update failed";
       if (message === "User not found") {
         return c.json({ error: "NotFound", message }, 404);

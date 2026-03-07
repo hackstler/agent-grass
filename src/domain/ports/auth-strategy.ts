@@ -11,7 +11,13 @@ export interface AuthResult {
   emailVerified?: boolean;
 }
 
+export type AuthCredentials =
+  | { type: "token"; token: string }
+  | { type: "password"; email: string; password: string };
+
 export interface AuthStrategy {
-  readonly name: string;
-  verifyToken(token: string): Promise<AuthResult>;
+  readonly name: "password" | "firebase";
+  authenticate(credentials: AuthCredentials): Promise<AuthResult>;
+  supportsPasswordManagement(): boolean;
+  hashPassword?(password: string): string;
 }

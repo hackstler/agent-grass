@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { OrganizationManager } from "../../application/managers/organization.manager.js";
+import { PasswordStrategy } from "../../infrastructure/auth/password.strategy.js";
 import {
   createMockUserRepo,
   createMockDocumentRepo,
@@ -20,7 +21,6 @@ describe("OrganizationManager", () => {
   let orgRepo: ReturnType<typeof createMockOrgRepo>;
   let catalogRepo: ReturnType<typeof createMockCatalogRepo>;
   let manager: OrganizationManager;
-  const passwordSalt = "test-salt";
 
   beforeEach(() => {
     userRepo = createMockUserRepo();
@@ -29,7 +29,8 @@ describe("OrganizationManager", () => {
     sessionRepo = createMockSessionRepo();
     orgRepo = createMockOrgRepo();
     catalogRepo = createMockCatalogRepo();
-    manager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, orgRepo, catalogRepo, passwordSalt);
+    const strategy = new PasswordStrategy("test-salt", userRepo);
+    manager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, orgRepo, catalogRepo, strategy);
   });
 
   // ── list ───────────────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ import { ConversationManager } from "../../application/managers/conversation.man
 import { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
 import { TopicManager } from "../../application/managers/topic.manager.js";
 import { OrganizationManager } from "../../application/managers/organization.manager.js";
+import { PasswordStrategy } from "../../infrastructure/auth/password.strategy.js";
 import {
   createMockUserRepo,
   createMockDocumentRepo,
@@ -89,13 +90,15 @@ export function createTestApp(): TestContext {
     catalog: createMockCatalogRepo(),
   };
 
+  const authStrategy = new PasswordStrategy(PASSWORD_SALT, repos.user);
+
   const managers = {
-    user: new UserManager(repos.user, PASSWORD_SALT),
+    user: new UserManager(repos.user, authStrategy),
     doc: new DocumentManager(repos.doc),
     conv: new ConversationManager(repos.conv),
     wa: new WhatsAppManager(repos.session, repos.user),
     topic: new TopicManager(repos.topic),
-    org: new OrganizationManager(repos.user, repos.doc, repos.topic, repos.session, repos.org, repos.catalog, PASSWORD_SALT),
+    org: new OrganizationManager(repos.user, repos.doc, repos.topic, repos.session, repos.org, repos.catalog, authStrategy),
   };
 
   const mockAgent = {
@@ -117,7 +120,7 @@ export function createTestApp(): TestContext {
     orgManager: managers.org,
     coordinatorAgent: mockAgent as unknown as AppDependencies["coordinatorAgent"],
     authConfig: testAuthConfig,
-    authStrategy: null,
+    authStrategy,
   });
 
   return { app, repos, managers, mockAgent };

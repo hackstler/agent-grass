@@ -41,7 +41,7 @@ export interface AppDependencies {
   coordinatorAgent: Agent;
   pluginRegistry?: PluginRegistry;
   authConfig: AuthConfig;
-  authStrategy: AuthStrategy | null;
+  authStrategy: AuthStrategy;
   oauthManager?: OAuthManager;
   catalogManager?: CatalogManager;
   invitationManager?: InvitationManager;

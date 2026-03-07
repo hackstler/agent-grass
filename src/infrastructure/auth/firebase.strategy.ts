@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
-import type { AuthStrategy, AuthResult } from "../../domain/ports/auth-strategy.js";
+import type { AuthStrategy, AuthResult, AuthCredentials } from "../../domain/ports/auth-strategy.js";
+import { ValidationError } from "../../domain/errors/index.js";
 
 const { verify, decode } = jwt;
 
@@ -39,7 +40,7 @@ async function fetchPublicKeys(): Promise<Record<string, string>> {
 }
 
 export class FirebaseStrategy implements AuthStrategy {
-  readonly name = "firebase";
+  readonly name = "firebase" as const;
   private readonly projectId: string;
 
   constructor(projectId: string) {
@@ -49,7 +50,19 @@ export class FirebaseStrategy implements AuthStrategy {
     this.projectId = projectId;
   }
 
-  async verifyToken(token: string): Promise<AuthResult> {
+  async authenticate(credentials: AuthCredentials): Promise<AuthResult> {
+    if (credentials.type === "password") {
+      throw new ValidationError("Firebase does not accept password credentials");
+    }
+
+    return this.verifyToken(credentials.token);
+  }
+
+  supportsPasswordManagement(): boolean {
+    return false;
+  }
+
+  private async verifyToken(token: string): Promise<AuthResult> {
     // Decode header to get kid
     const decoded = decode(token, { complete: true });
     if (!decoded || typeof decoded === "string") {
