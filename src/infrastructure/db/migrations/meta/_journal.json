@@ -57,6 +57,13 @@
       "when": 1772920000000,
       "tag": "0011_add_user_name_surname",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772930000000,
+      "tag": "0012_add_pairing_code_support",
+      "breakpoints": true
     }
   ]
 }

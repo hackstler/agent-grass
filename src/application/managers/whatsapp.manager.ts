@@ -76,6 +76,7 @@ export class WhatsAppManager {
       status: "disconnected",
       qrData: null,
       phone: null,
+      pairingCode: null,
     });
   }
 
