@@ -12,13 +12,13 @@ export interface WhatsAppSessionWithUser {
 
 export interface WhatsAppSessionRepository {
   findByUserId(userId: string): Promise<WhatsappSession | null>;
-  findAllActive(): Promise<Pick<WhatsappSession, "userId" | "orgId">[]>;
+  findAllActive(): Promise<Pick<WhatsappSession, "userId" | "orgId" | "linkingMethod" | "phoneNumber">[]>;
   findAllWithUser(): Promise<WhatsAppSessionWithUser[]>;
   findAllWithUserByOrg(orgId: string): Promise<WhatsAppSessionWithUser[]>;
   upsertByUserId(data: NewWhatsappSession): Promise<WhatsappSession>;
   updateByUserId(
     userId: string,
-    data: Partial<Pick<WhatsappSession, "status" | "qrData" | "phone" | "updatedAt">>
+    data: Partial<Pick<WhatsappSession, "status" | "qrData" | "phone" | "updatedAt" | "pairingCode" | "phoneNumber" | "linkingMethod">>
   ): Promise<void>;
   create(data: NewWhatsappSession): Promise<Pick<WhatsappSession, "id" | "userId" | "orgId" | "status">>;
   deleteByOrgId(orgId: string): Promise<void>;

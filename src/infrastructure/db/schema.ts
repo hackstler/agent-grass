@@ -166,9 +166,12 @@ export const whatsappSessions = pgTable("whatsapp_sessions", {
     .unique()
     .references(() => users.id, { onDelete: "cascade" }),
   status: text("status").notNull().default("disconnected"),
-  // 'disconnected' | 'pending' | 'qr' | 'connected'
+  // 'disconnected' | 'pending' | 'qr' | 'code' | 'connected'
   qrData: text("qr_data"),
   phone: text("phone"),
+  linkingMethod: text("linking_method").notNull().default("qr"),
+  pairingCode: text("pairing_code"),
+  phoneNumber: text("phone_number"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

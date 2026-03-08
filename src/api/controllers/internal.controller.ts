@@ -21,6 +21,11 @@ const qrSchema = z.object({
   userId: z.string().uuid(),
 });
 
+const pairingCodeSchema = z.object({
+  userId: z.string().uuid(),
+  code: z.string().min(1),
+});
+
 const statusSchema = z.object({
   status: z.enum(["connected", "disconnected"]),
   phone: z.string().optional(),
@@ -85,6 +90,15 @@ export function createInternalController(
     if (!parsed.success) return c.json({ error: parsed.error.message }, 400);
 
     const result = await waManager.reportQr(parsed.data.userId, parsed.data.qrData);
+    return c.json({ data: result });
+  });
+
+  router.post("/whatsapp/pairing-code", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = pairingCodeSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400);
+
+    const result = await waManager.reportPairingCode(parsed.data.userId, parsed.data.code);
     return c.json({ data: result });
   });
 

@@ -204,6 +204,9 @@ export interface WhatsappSession {
   status: string;
   qrData: string | null;
   phone: string | null;
+  linkingMethod: string;
+  pairingCode: string | null;
+  phoneNumber: string | null;
   updatedAt: Date;
 }
 
@@ -214,6 +217,9 @@ export interface NewWhatsappSession {
   status?: string | undefined;
   qrData?: string | null | undefined;
   phone?: string | null | undefined;
+  linkingMethod?: string | undefined;
+  pairingCode?: string | null | undefined;
+  phoneNumber?: string | null | undefined;
   updatedAt?: Date | undefined;
 }
 

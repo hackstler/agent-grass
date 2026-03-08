@@ -12,7 +12,7 @@ export class DrizzleWhatsAppSessionRepository implements WhatsAppSessionReposito
     return result ?? null;
   }
 
-  async findAllActive(): Promise<Pick<WhatsappSession, "userId" | "orgId">[]> {
+  async findAllActive(): Promise<Pick<WhatsappSession, "userId" | "orgId" | "linkingMethod" | "phoneNumber">[]> {
     // Auto-disconnect stale sessions: qr/pending not updated in 5 minutes are zombies.
     // This prevents zombie sessions from filling MAX_SESSIONS and blocking new connections.
     const staleThreshold = new Date(Date.now() - 5 * 60 * 1000);
@@ -21,13 +21,18 @@ export class DrizzleWhatsAppSessionRepository implements WhatsAppSessionReposito
       .set({ status: "disconnected", qrData: null, updatedAt: new Date() })
       .where(
         and(
-          inArray(whatsappSessions.status, ["qr", "pending"]),
+          inArray(whatsappSessions.status, ["qr", "pending", "code"]),
           lt(whatsappSessions.updatedAt, staleThreshold),
         ),
       );
 
     return db
-      .select({ userId: whatsappSessions.userId, orgId: whatsappSessions.orgId })
+      .select({
+        userId: whatsappSessions.userId,
+        orgId: whatsappSessions.orgId,
+        linkingMethod: whatsappSessions.linkingMethod,
+        phoneNumber: whatsappSessions.phoneNumber,
+      })
       .from(whatsappSessions)
       .where(ne(whatsappSessions.status, "disconnected"));
   }
@@ -75,6 +80,9 @@ export class DrizzleWhatsAppSessionRepository implements WhatsAppSessionReposito
           status: data.status,
           qrData: data.qrData ?? null,
           phone: data.phone ?? null,
+          linkingMethod: data.linkingMethod ?? "qr",
+          pairingCode: data.pairingCode ?? null,
+          phoneNumber: data.phoneNumber ?? null,
           updatedAt: new Date(),
         },
       })
@@ -84,7 +92,7 @@ export class DrizzleWhatsAppSessionRepository implements WhatsAppSessionReposito
 
   async updateByUserId(
     userId: string,
-    data: Partial<Pick<WhatsappSession, "status" | "qrData" | "phone" | "updatedAt">>
+    data: Partial<Pick<WhatsappSession, "status" | "qrData" | "phone" | "updatedAt" | "pairingCode" | "phoneNumber" | "linkingMethod">>
   ): Promise<void> {
     await db
       .update(whatsappSessions)

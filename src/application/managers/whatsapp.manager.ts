@@ -11,12 +11,14 @@ export class WhatsAppManager {
 
   async getStatusForUser(
     userId: string
-  ): Promise<{ status: string; phone: string | null; updatedAt?: string }> {
+  ): Promise<{ status: string; phone: string | null; linkingMethod?: string; pairingCode?: string | null; updatedAt?: string }> {
     const session = await this.sessionRepo.findByUserId(userId);
     if (!session) return { status: "not_enabled", phone: null };
     return {
       status: session.status,
       phone: session.phone,
+      linkingMethod: session.linkingMethod,
+      pairingCode: session.pairingCode,
       updatedAt: session.updatedAt.toISOString(),
     };
   }
@@ -31,7 +33,9 @@ export class WhatsAppManager {
 
   async enableForUser(
     userId: string,
-    orgId: string
+    orgId: string,
+    linkingMethod?: string,
+    phoneNumber?: string,
   ): Promise<Pick<WhatsappSession, "id" | "userId" | "orgId" | "status">> {
     const existing = await this.sessionRepo.findByUserId(userId);
 
@@ -39,16 +43,29 @@ export class WhatsAppManager {
       throw new ConflictError("WhatsApp session", `userId '${userId}'`);
     }
 
+    const method = linkingMethod ?? "qr";
+
     if (existing) {
       await this.sessionRepo.updateByUserId(userId, {
         status: "pending",
         qrData: null,
         phone: null,
+        linkingMethod: method,
+        pairingCode: null,
+        phoneNumber: phoneNumber ?? null,
       });
       return { id: existing.id, userId, orgId, status: "pending" };
     }
 
-    return this.sessionRepo.create({ userId, orgId, status: "pending" });
+    return this.sessionRepo.create({ userId, orgId, status: "pending", linkingMethod: method, phoneNumber: phoneNumber ?? null });
+  }
+
+  async getPairingCodeForUser(userId: string): Promise<{ pairingCode: string }> {
+    const session = await this.sessionRepo.findByUserId(userId);
+    if (!session || session.status !== "code" || !session.pairingCode) {
+      throw new NotFoundError("Pairing code", userId);
+    }
+    return { pairingCode: session.pairingCode };
   }
 
   async disconnectForUser(userId: string): Promise<void> {
@@ -62,7 +79,7 @@ export class WhatsAppManager {
     });
   }
 
-  async listActiveSessions(): Promise<Pick<WhatsappSession, "userId" | "orgId">[]> {
+  async listActiveSessions(): Promise<Pick<WhatsappSession, "userId" | "orgId" | "linkingMethod" | "phoneNumber">[]> {
     return this.sessionRepo.findAllActive();
   }
 
@@ -86,6 +103,21 @@ export class WhatsAppManager {
     });
 
     return { status: "qr", userId, orgId: user.orgId! };
+  }
+
+  async reportPairingCode(userId: string, code: string): Promise<{ status: string; userId: string; orgId: string }> {
+    const user = await this.userRepo.findById(userId);
+    if (!user) throw new NotFoundError("User", userId);
+
+    await this.sessionRepo.upsertByUserId({
+      userId,
+      orgId: user.orgId!,
+      status: "code",
+      pairingCode: code,
+      qrData: null,
+    });
+
+    return { status: "code", userId, orgId: user.orgId! };
   }
 
   async reportStatus(
