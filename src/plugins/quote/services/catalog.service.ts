@@ -6,6 +6,7 @@ export interface CatalogItemResult {
   id: string;
   code: number;
   name: string;
+  description: string | null;
   pricePerUnit: number;
   unit: string;
 }
@@ -47,6 +48,7 @@ export class CatalogService {
         id: catalogItems.id,
         code: catalogItems.code,
         name: catalogItems.name,
+        description: catalogItems.description,
         pricePerUnit: catalogItems.pricePerUnit,
         unit: catalogItems.unit,
       })
@@ -67,6 +69,7 @@ export class CatalogService {
       id: item.id,
       code: item.code,
       name: item.name,
+      description: item.description ?? null,
       pricePerUnit: parseFloat(String(item.pricePerUnit)),
       unit: item.unit,
     };
@@ -81,6 +84,7 @@ export class CatalogService {
         id: catalogItems.id,
         code: catalogItems.code,
         name: catalogItems.name,
+        description: catalogItems.description,
         pricePerUnit: catalogItems.pricePerUnit,
         unit: catalogItems.unit,
       })
@@ -90,6 +94,7 @@ export class CatalogService {
 
     return rows.map((r) => ({
       ...r,
+      description: r.description ?? null,
       pricePerUnit: parseFloat(String(r.pricePerUnit)),
     }));
   }

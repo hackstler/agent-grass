@@ -8,6 +8,13 @@ import { ConflictError } from "../../domain/errors/index.js";
 export class DrizzleCatalogRepository implements CatalogRepository {
   // ── Catalogs ──────────────────────────────────────────────────────────────
 
+  async findAll(): Promise<Catalog[]> {
+    return db
+      .select()
+      .from(catalogs)
+      .orderBy(desc(catalogs.createdAt));
+  }
+
   async findByOrgId(orgId: string): Promise<Catalog[]> {
     return db
       .select()

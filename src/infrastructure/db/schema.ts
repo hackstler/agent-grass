@@ -63,6 +63,10 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export interface OrgFeatures {
+  quotes?: boolean;
+}
+
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: text("org_id").notNull().unique(),
@@ -75,6 +79,7 @@ export const organizations = pgTable("organizations", {
   logo: text("logo"),
   vatRate: numeric("vat_rate", { precision: 5, scale: 4 }),
   currency: text("currency").notNull().default("€"),
+  features: jsonb("features").$type<OrgFeatures>().default({}),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

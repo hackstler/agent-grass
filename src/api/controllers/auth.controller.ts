@@ -49,6 +49,7 @@ export function createAuthController(
   authConfig: AuthConfig,
   strategy: AuthStrategy,
   invitationManager?: InvitationManager,
+  organizationRepo?: import("../../domain/ports/repositories/organization.repository.js").OrganizationRepository,
 ): Hono {
   const router = new Hono();
 
@@ -253,6 +254,14 @@ export function createAuthController(
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const fullUser = await manager.getById(user.userId);
     const meta = fullUser.metadata as Record<string, unknown> | null;
+
+    // Resolve org features
+    let orgFeatures: Record<string, unknown> = {};
+    if (organizationRepo && user.orgId) {
+      const org = await organizationRepo.findByOrgId(user.orgId);
+      if (org?.features) orgFeatures = org.features as Record<string, unknown>;
+    }
+
     return c.json({
       userId: user.userId,
       email: user.email,
@@ -263,6 +272,7 @@ export function createAuthController(
       onboardingComplete: meta?.["onboardingComplete"] !== false, // default true for existing users
       firstName: meta?.["firstName"] ?? null,
       lastName: meta?.["lastName"] ?? null,
+      orgFeatures,
     });
   });
 

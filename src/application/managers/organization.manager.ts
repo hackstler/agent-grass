@@ -29,6 +29,7 @@ export interface CreateOrgDto {
   logo?: string | null | undefined;
   vatRate?: string | null | undefined;
   currency?: string | undefined;
+  features?: import("../../domain/entities/index.js").OrgFeatures | null | undefined;
 }
 
 export interface UpdateOrgDto {
@@ -41,6 +42,7 @@ export interface UpdateOrgDto {
   logo?: string | null | undefined;
   vatRate?: string | null | undefined;
   currency?: string | undefined;
+  features?: import("../../domain/entities/index.js").OrgFeatures | null | undefined;
   metadata?: Record<string, unknown> | null | undefined;
 }
 
@@ -107,6 +109,7 @@ export class OrganizationManager {
       logo: dto.logo,
       vatRate: dto.vatRate,
       currency: dto.currency,
+      features: dto.features,
     });
 
     const admin = await this.userRepo.create({

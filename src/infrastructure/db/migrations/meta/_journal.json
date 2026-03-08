@@ -78,6 +78,13 @@
       "when": 1773003208622,
       "tag": "0010_add_quotes_table",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773004652863,
+      "tag": "0011_add_org_features",
+      "breakpoints": true
     }
   ]
 }

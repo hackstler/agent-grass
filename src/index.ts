@@ -116,6 +116,7 @@ const app = createApp({
   catalogManager,
   invitationManager,
   quoteRepo,
+  organizationRepo: orgRepo,
 });
 
 // ── Startup ────────────────────────────────────────────────────────────────────

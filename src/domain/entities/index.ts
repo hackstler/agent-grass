@@ -161,6 +161,10 @@ export interface DocumentChunk {
 
 // ── Organization ─────────────────────────────────────────────────────────────
 
+export interface OrgFeatures {
+  quotes?: boolean;
+}
+
 export interface Organization {
   id: string;
   orgId: string;
@@ -173,6 +177,7 @@ export interface Organization {
   logo: string | null;
   vatRate: string | null;
   currency: string;
+  features: OrgFeatures | null;
   metadata: Record<string, unknown> | null;
   createdAt: Date;
   updatedAt: Date;
@@ -190,6 +195,7 @@ export interface NewOrganization {
   logo?: string | null | undefined;
   vatRate?: string | null | undefined;
   currency?: string | undefined;
+  features?: OrgFeatures | null | undefined;
   metadata?: Record<string, unknown> | null | undefined;
   createdAt?: Date | undefined;
   updatedAt?: Date | undefined;

@@ -45,6 +45,10 @@ export class CatalogManager {
     return this.repo.findByOrgId(orgId);
   }
 
+  async listAllCatalogs(): Promise<Catalog[]> {
+    return this.repo.findAll();
+  }
+
   async getCatalog(orgId: string, catalogId: string): Promise<Catalog> {
     const catalog = await this.repo.findByOrgAndId(orgId, catalogId);
     if (!catalog) throw new NotFoundError("Catalog", catalogId);

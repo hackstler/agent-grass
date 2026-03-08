@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { CatalogManager } from "../../application/managers/catalog.manager.js";
+import type { OrganizationRepository } from "../../domain/ports/repositories/organization.repository.js";
 
 const createCatalogValidator = z.object({
   name: z.string().min(1).max(200),
@@ -36,14 +37,36 @@ const updateItemValidator = z.object({
   isActive: z.boolean().optional(),
 });
 
-export function createCatalogController(manager: CatalogManager): Hono {
+export function createCatalogController(manager: CatalogManager, orgRepo?: OrganizationRepository): Hono {
   const router = new Hono();
 
   // ── Catalogs ──────────────────────────────────────────────────────────────
 
   router.get("/", async (c) => {
-    const orgId = c.get("user")?.orgId;
+    const user = c.get("user");
+    const orgId = user?.orgId;
     if (!orgId) return c.json({ error: "Unauthorized", message: "No orgId in token" }, 401);
+
+    // Super admin sees all catalogs with org names
+    if (user?.role === "super_admin") {
+      const rows = await manager.listAllCatalogs();
+
+      // Resolve org names
+      const uniqueOrgIds = [...new Set(rows.map((r) => r.orgId))];
+      const orgNameMap = new Map<string, string | null>();
+      if (orgRepo) {
+        await Promise.all(
+          uniqueOrgIds.map(async (oid) => {
+            const org = await orgRepo.findByOrgId(oid);
+            orgNameMap.set(oid, org?.name ?? null);
+          }),
+        );
+      }
+
+      const enriched = rows.map((r) => ({ ...r, orgName: orgNameMap.get(r.orgId) ?? null }));
+      return c.json({ items: enriched, total: enriched.length });
+    }
+
     const rows = await manager.listCatalogs(orgId);
     return c.json({ items: rows, total: rows.length });
   });

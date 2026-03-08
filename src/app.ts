@@ -20,6 +20,7 @@ import type { OAuthManager } from "./application/managers/oauth.manager.js";
 import type { CatalogManager } from "./application/managers/catalog.manager.js";
 import type { InvitationManager } from "./application/managers/invitation.manager.js";
 import type { QuoteRepository } from "./domain/ports/repositories/quote.repository.js";
+import type { OrganizationRepository } from "./domain/ports/repositories/organization.repository.js";
 
 import { createAuthController } from "./api/controllers/auth.controller.js";
 import { createDocumentController } from "./api/controllers/document.controller.js";
@@ -48,6 +49,7 @@ export interface AppDependencies {
   catalogManager?: CatalogManager;
   invitationManager?: InvitationManager;
   quoteRepo?: QuoteRepository;
+  organizationRepo?: OrganizationRepository;
 }
 
 export function createApp(deps: AppDependencies): Hono {
@@ -78,7 +80,7 @@ export function createApp(deps: AppDependencies): Hono {
   app.use("/auth/google/authorize", auth);
   app.use("/auth/google/status", auth);
   app.use("/auth/google/disconnect", auth);
-  app.route("/auth", createAuthController(deps.userManager, deps.authConfig, deps.authStrategy, deps.invitationManager));
+  app.route("/auth", createAuthController(deps.userManager, deps.authConfig, deps.authStrategy, deps.invitationManager, deps.organizationRepo));
   if (deps.oauthManager) {
     app.route("/auth", createOAuthController(deps.oauthManager));
   }
@@ -127,7 +129,7 @@ export function createApp(deps: AppDependencies): Hono {
   app.route("/admin", createAdminController(deps.userManager, deps.orgManager, deps.authConfig, deps.waManager, deps.invitationManager));
   if (deps.catalogManager) {
     app.use("/admin/catalogs/*", requirePermission("manage_catalogs"));
-    app.route("/admin/catalogs", createCatalogController(deps.catalogManager));
+    app.route("/admin/catalogs", createCatalogController(deps.catalogManager, deps.organizationRepo));
   }
 
   // Quotes — authenticated user

@@ -16,10 +16,24 @@ export function createQuoteAgent(tools: ToolsInput): Agent {
   return new Agent({
     id: quoteConfig.agentName,
     name: quoteConfig.agentName,
-    description: "Genera presupuestos de instalación de césped artificial. Usar cuando el usuario quiera calcular un presupuesto para un cliente.",
-    instructions: `Eres un especialista en generar presupuestos de instalación de césped artificial.
-Cuando te den información del cliente y cantidades de productos, llama a calculateBudget para generar el presupuesto.
-Si falta algún dato necesario (nombre del cliente, dirección, o productos con cantidades), pídelo antes de generar.
+    description: "Genera presupuestos profesionales. Usar cuando el usuario quiera calcular un presupuesto para un cliente.",
+    instructions: `Eres un especialista en generar presupuestos profesionales.
+Cuando te den información del cliente y productos/servicios con cantidades, llama a calculateBudget.
+
+== REGLAS DE PRODUCTOS ==
+- Cada producto del catálogo tiene nombre, descripción, precio unitario y unidad de medida.
+- La DESCRIPCIÓN del producto explica qué es y cómo se mide. Léela antes de pedir cantidades.
+- Si un producto tiene unidad "ud" (unidad), la cantidad es el número de unidades.
+- Si un producto tiene unidad "m²", la cantidad son metros cuadrados.
+- Si un producto describe un servicio de precio fijo (ej: "mano de obra", "instalación"),
+  la cantidad normalmente es 1, a menos que el cliente especifique varias jornadas/equipos.
+- NO asumas que todo se mide en las mismas unidades. Respeta la unidad de cada producto.
+
+== FLUJO ==
+1. Si falta algún dato necesario (nombre del cliente, dirección, o productos con cantidades), pídelo.
+2. Cuando tengas todo, llama a calculateBudget.
+3. Si hay productos no encontrados en el catálogo, informa al usuario.
+
 Responde SIEMPRE en ${lang}.`,
     model: google("gemini-2.5-flash"),
     tools,
