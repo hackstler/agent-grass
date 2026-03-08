@@ -61,8 +61,15 @@
     {
       "idx": 8,
       "version": "7",
-      "when": 1772930000000,
-      "tag": "0012_add_pairing_code_support",
+      "when": 1772985112952,
+      "tag": "0008_baseline_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772985125568,
+      "tag": "0009_add_pairing_code_support",
       "breakpoints": true
     }
   ]

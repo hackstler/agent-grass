@@ -20,11 +20,14 @@
 | `catalogs` | Catálogos de productos (quote plugin) | orgId |
 | `catalog_items` | Items del catálogo con precios | catalogId → catalogs |
 
-## Migrations
-- **Nunca** modificar migraciones existentes. Crear una nueva para cada cambio.
-- Nombre descriptivo: `0005_add_catalog_tables.sql`, etc.
-- Ejecutar con `npm run migrate` (usa `drizzle-kit migrate`).
-- En agent-grass: las migraciones se ejecutan **automáticamente en startup** (`src/infrastructure/db/client.ts`).
+## Migrations — MANDATORY WORKFLOW
+- **NUNCA escribir SQL de migración a mano**. Siempre usar `npx drizzle-kit generate --name=<nombre>`.
+- **NUNCA editar `meta/_journal.json`** manualmente. `drizzle-kit generate` lo actualiza automáticamente.
+- **NUNCA crear/editar archivos `meta/*_snapshot.json`** manualmente.
+- Workflow: modificar `schema.ts` → `npx drizzle-kit generate --name=<nombre>` → revisar SQL generado → commit.
+- Para migraciones de datos (sin cambio de schema): `npx drizzle-kit generate --custom --name=<nombre>`.
+- Las migraciones se ejecutan **automáticamente en startup** (`src/infrastructure/db/client.ts`).
+- Ver `/.claude/commands/migrate.md` para el workflow completo.
 
 ## Vector column
 - Dimensión configurada en el schema (actualmente 768 para Gemini embeddings).
