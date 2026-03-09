@@ -91,8 +91,12 @@ export class OrganizationManager {
   }
 
   async create(dto: CreateOrgDto): Promise<{ orgId: string; admin: Record<string, unknown> }> {
-    const existingOrg = await this.userRepo.findFirstByOrg(dto.orgId);
-    if (existingOrg) throw new ConflictError("Organization", `orgId '${dto.orgId}'`);
+    // Check both users and organizations tables for existing orgId
+    const [existingOrgRow, existingOrgUser] = await Promise.all([
+      this.orgRepo.findByOrgId(dto.orgId),
+      this.userRepo.findFirstByOrg(dto.orgId),
+    ]);
+    if (existingOrgRow || existingOrgUser) throw new ConflictError("Organization", `orgId '${dto.orgId}'`);
 
     const existingUser = await this.userRepo.findByEmail(dto.adminEmail);
     if (existingUser) throw new ConflictError("User", `email '${dto.adminEmail}'`);
