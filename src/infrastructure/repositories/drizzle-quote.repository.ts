@@ -20,6 +20,11 @@ export class DrizzleQuoteRepository implements QuoteRepository {
         total: quotes.total,
         pdfBase64: quotes.pdfBase64,
         filename: quotes.filename,
+        quoteData: quotes.quoteData,
+        surfaceType: quotes.surfaceType,
+        areaM2: quotes.areaM2,
+        perimeterLm: quotes.perimeterLm,
+        province: quotes.province,
         createdAt: quotes.createdAt,
       })
       .from(quotes)
