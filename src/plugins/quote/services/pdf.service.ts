@@ -18,6 +18,7 @@ export interface CompanyDetails {
   logo: string | null;
   vatRate: number;
   currency: string;
+  web: string;
 }
 
 export interface QuoteData {
@@ -30,6 +31,29 @@ export interface QuoteData {
   subtotal: number;
   vatAmount: number;
   total: number;
+}
+
+export interface ComparisonRow {
+  grassName: string;
+  pricePerM2: number;
+  totalGrassInstalled: number;
+  traviesasTotal: number;
+  baseImponible: number;
+  iva: number;
+  totalConIva: number;
+}
+
+export interface ComparisonPdfData {
+  quoteNumber: string;
+  date: string;
+  company: CompanyDetails;
+  clientName: string;
+  clientAddress: string;
+  province: string;
+  areaM2: number;
+  surfaceType: "SOLADO" | "TIERRA";
+  perimeterLm: number;
+  rows: ComparisonRow[];
 }
 
 const C = {
@@ -47,7 +71,9 @@ const MARGIN = 48;
 const COL_W = PAGE_W - MARGIN * 2;
 
 function fmt(n: number, currency: string): string {
-  return n.toFixed(2).replace(".", ",") + " " + currency;
+  const [int, dec] = n.toFixed(2).split(".");
+  const withDots = int!.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return withDots + "," + dec + " " + currency;
 }
 
 export class PdfService {
@@ -201,6 +227,239 @@ export class PdfService {
     page.drawText("Este presupuesto tiene una validez de 30 días desde su fecha de emisión.", {
       x: MARGIN, y: MARGIN + 10,
       font: regular, size: 8, color: C.midGray,
+    });
+
+    const bytes = await doc.save();
+    return Buffer.from(bytes).toString("base64");
+  }
+
+  /**
+   * Generates a landscape A4 comparison PDF matching Madrid Césped style:
+   * white background, logo top-left, contact top-right, label:value client data,
+   * 7-column comparison table, legal texts at bottom.
+   */
+  async generateComparisonPdf(data: ComparisonPdfData): Promise<string> {
+    const doc = await PDFDocument.create();
+    const LW = 842;
+    const LH = 595;
+    const page = doc.addPage([LW, LH]);
+    const regular = await doc.embedFont(StandardFonts.Helvetica);
+    const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+    const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
+
+    const { company } = data;
+    const currency = company.currency;
+    const M = 36;
+    const tableW = LW - M * 2;
+
+    let y = LH - M;
+
+    // ── Logo (top-left, large) ────────────────────────────────────────────
+    let logoImage: Awaited<ReturnType<typeof doc.embedPng>> | null = null;
+    if (company.logo) {
+      try {
+        const raw = company.logo.includes(",")
+          ? company.logo.split(",")[1]!
+          : company.logo;
+        const logoBytes = Buffer.from(raw, "base64");
+        try {
+          logoImage = await doc.embedPng(logoBytes);
+        } catch {
+          logoImage = await doc.embedJpg(logoBytes) as unknown as typeof logoImage;
+        }
+      } catch {
+        // skip
+      }
+    }
+
+    if (logoImage) {
+      const dims = logoImage.scale(1);
+      const maxH = 70;
+      const maxW = 180;
+      const scale = Math.min(maxH / dims.height, maxW / dims.width, 1);
+      const lw = dims.width * scale;
+      const lh = dims.height * scale;
+      page.drawImage(logoImage, {
+        x: M,
+        y: y - lh,
+        width: lw,
+        height: lh,
+      });
+    }
+
+    // ── Contact info (top-right) ──────────────────────────────────────────
+    const rightX = LW - M;
+    const emailText = company.email.toUpperCase();
+    const emailW = bold.widthOfTextAtSize(emailText, 10);
+    page.drawText(emailText, {
+      x: rightX - emailW, y,
+      font: bold, size: 10, color: C.black,
+    });
+    y -= 14;
+    const telText = `tel: ${company.phone}`;
+    const telW = regular.widthOfTextAtSize(telText, 9);
+    page.drawText(telText, {
+      x: rightX - telW, y,
+      font: regular, size: 9, color: C.darkGray,
+    });
+    y -= 13;
+    const webW = regular.widthOfTextAtSize(company.web, 9);
+    page.drawText(company.web, {
+      x: rightX - webW, y,
+      font: regular, size: 9, color: C.darkGray,
+    });
+    y -= 24;
+
+    // ── Title ─────────────────────────────────────────────────────────────
+    page.drawText("PRESUPUESTO CÉSPED ARTIFICIAL", {
+      x: M, y,
+      font: bold, size: 16, color: C.black,
+    });
+    y -= 24;
+
+    // ── Client details (label:value aligned) ──────────────────────────────
+    const labelRightX = M + 80;
+    const valueLeftX = M + 90;
+
+    const fmtNum = (n: number) => {
+      const [int, dec] = n.toFixed(2).split(".");
+      const withDots = int!.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      return withDots + "," + dec;
+    };
+
+    const clientFields = [
+      { label: "CLIENTE:", value: data.clientName },
+      { label: "PROVINCIA:", value: data.province || "" },
+      { label: "DIRECCIÓN:", value: data.clientAddress },
+      { label: "FECHA:", value: data.date },
+      { label: "M2:", value: fmtNum(data.areaM2) },
+    ];
+
+    for (const field of clientFields) {
+      if (!field.value) continue;
+      const lw = bold.widthOfTextAtSize(field.label, 9);
+      page.drawText(field.label, {
+        x: labelRightX - lw, y,
+        font: bold, size: 9, color: C.darkGray,
+      });
+      page.drawText(field.value, {
+        x: valueLeftX, y,
+        font: regular, size: 9, color: C.black,
+      });
+      y -= 14;
+    }
+
+    y -= 6;
+
+    // ── Section header (underlined, no background) ────────────────────────
+    const sectionText = "Suministro + Instalación (Todo incluido)";
+    page.drawText(sectionText, {
+      x: M, y,
+      font: bold, size: 10, color: C.black,
+    });
+    const sectionW = bold.widthOfTextAtSize(sectionText, 10);
+    y -= 3;
+    page.drawLine({
+      start: { x: M, y },
+      end: { x: M + sectionW, y },
+      thickness: 1,
+      color: C.black,
+    });
+    y -= 16;
+
+    // ── Table ─────────────────────────────────────────────────────────────
+    const cols = [
+      { x: M,       w: 80  },  // grass name
+      { x: M + 80,  w: 110 },  // Precio M2
+      { x: M + 190, w: 120 },  // Total Césped
+      { x: M + 310, w: 120 },  // Traviesas
+      { x: M + 430, w: 110 },  // Base Imp.
+      { x: M + 540, w: 100 },  // IVA
+      { x: M + 640, w: 130 },  // TOTAL
+    ];
+
+    // Two-line header
+    const headers1 = ["", "Precio M2", "Total Césped", "Traviesas", "Base", "IVA", "TOTAL"];
+    const headers2 = ["", "Todo Incluido", "Instalado", "madera incl.", "Imponible", "(21%)", "IVA INCLUIDO"];
+
+    page.drawRectangle({ x: M, y: y - 8, width: tableW, height: 26, color: C.lightGray });
+    for (let c = 0; c < cols.length; c++) {
+      if (headers1[c]) {
+        page.drawText(headers1[c]!, {
+          x: cols[c]!.x + 4, y: y + 4,
+          font: bold, size: 7.5, color: C.darkGray,
+        });
+      }
+      if (headers2[c]) {
+        page.drawText(headers2[c]!, {
+          x: cols[c]!.x + 4, y: y - 6,
+          font: regular, size: 7, color: C.midGray,
+        });
+      }
+    }
+    y -= 28;
+
+    // Data rows
+    for (let i = 0; i < data.rows.length; i++) {
+      const row = data.rows[i]!;
+      if (i % 2 === 0) {
+        page.drawRectangle({ x: M, y: y - 4, width: tableW, height: 16, color: rgb(0.97, 0.97, 0.97) });
+      }
+
+      const values = [
+        row.grassName,
+        fmt(row.pricePerM2, currency),
+        fmt(row.totalGrassInstalled, currency),
+        fmt(row.traviesasTotal, currency),
+        fmt(row.baseImponible, currency),
+        fmt(row.iva, currency),
+        fmt(row.totalConIva, currency),
+      ];
+
+      for (let c = 0; c < cols.length; c++) {
+        const isFirst = c === 0;
+        const isLast = c === cols.length - 1;
+        page.drawText(values[c]!, {
+          x: cols[c]!.x + 4, y,
+          font: (isFirst || isLast) ? bold : regular,
+          size: 8,
+          color: C.black,
+        });
+      }
+      y -= 16;
+    }
+
+    y -= 6;
+    page.drawLine({ start: { x: M, y }, end: { x: LW - M, y }, thickness: 0.5, color: C.midGray });
+
+    // ── Note (traviesas) ──────────────────────────────────────────────────
+    y -= 14;
+    const perimeterStr = data.perimeterLm.toFixed(1).replace(".", ",");
+    page.drawText(`*Traviesa de madera instalada en todo el perímetro ${perimeterStr} ml`, {
+      x: M, y,
+      font: regular, size: 8, color: C.darkGray,
+    });
+
+    // ── Legal texts (bottom, italic) ──────────────────────────────────────
+    let legalY = M + 36;
+
+    if (quoteConfig.companyRegistration) {
+      page.drawText(quoteConfig.companyRegistration, {
+        x: M, y: legalY,
+        font: italic, size: 7, color: C.midGray,
+      });
+      legalY += 12;
+    }
+
+    page.drawText(`Este presupuesto tiene una validez de ${quoteConfig.quoteValidityDays} días.`, {
+      x: M, y: legalY,
+      font: italic, size: 7.5, color: C.darkGray,
+    });
+    legalY += 12;
+
+    page.drawText(quoteConfig.paymentTerms, {
+      x: M, y: legalY,
+      font: italic, size: 7.5, color: C.darkGray,
     });
 
     const bytes = await doc.save();

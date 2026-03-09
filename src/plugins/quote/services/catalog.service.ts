@@ -1,6 +1,7 @@
 import { eq, and, ilike, sql } from "drizzle-orm";
 import { db } from "../../../infrastructure/db/client.js";
-import { catalogs, catalogItems } from "../../../infrastructure/db/schema.js";
+import { catalogs, catalogItems, grassPricing } from "../../../infrastructure/db/schema.js";
+import { quoteConfig } from "../config/quote.config.js";
 
 export interface CatalogItemResult {
   id: string;
@@ -9,6 +10,11 @@ export interface CatalogItemResult {
   description: string | null;
   pricePerUnit: number;
   unit: string;
+}
+
+export interface GrassPriceResult {
+  grassName: string;
+  pricePerM2: number;
 }
 
 export class CatalogService {
@@ -101,6 +107,40 @@ export class CatalogService {
       ...r,
       description: r.description ?? null,
       pricePerUnit: parseFloat(String(r.pricePerUnit)),
+    }));
+  }
+
+  /**
+   * Returns the S+I price per m² for all grass types at a given (surfaceType, areaM2).
+   * Uses ceil(areaM2) clamped to maxM2Lookup for the lookup.
+   */
+  async getAllGrassPrices(
+    catalogId: string,
+    surfaceType: "SOLADO" | "TIERRA",
+    areaM2: number,
+  ): Promise<GrassPriceResult[]> {
+    const lookupM2 = Math.min(Math.ceil(areaM2), quoteConfig.maxM2Lookup);
+
+    const rows = await db
+      .select({
+        grassName: catalogItems.name,
+        pricePerM2: grassPricing.pricePerM2,
+      })
+      .from(grassPricing)
+      .innerJoin(catalogItems, eq(grassPricing.catalogItemId, catalogItems.id))
+      .where(
+        and(
+          eq(catalogItems.catalogId, catalogId),
+          eq(catalogItems.isActive, true),
+          eq(grassPricing.surfaceType, surfaceType),
+          eq(grassPricing.m2, lookupM2),
+        )
+      )
+      .orderBy(catalogItems.sortOrder);
+
+    return rows.map((r) => ({
+      grassName: r.grassName,
+      pricePerM2: parseFloat(String(r.pricePerM2)),
     }));
   }
 }

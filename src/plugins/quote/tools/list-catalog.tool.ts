@@ -9,22 +9,21 @@ export interface ListCatalogDeps {
 export function createListCatalogTool({ catalogService }: ListCatalogDeps) {
   return createTool({
     id: "listCatalog",
-    description: `List all available products in the organization's active catalog.
-Call this FIRST before generating any quote, so you know the exact product names, codes, prices and units.
-Returns all active catalog items with their details.`,
+    description: `List the available grass types in the organization's catalog.
+Returns grass type names and descriptions. Pricing varies by surface type and m² — use calculateBudget for actual prices.`,
 
     inputSchema: z.object({}),
 
     outputSchema: z.object({
       success: z.boolean(),
       catalogName: z.string(),
-      items: z.array(z.object({
+      grassTypes: z.array(z.object({
         code: z.number(),
         name: z.string(),
         description: z.string().nullable(),
-        pricePerUnit: z.number(),
         unit: z.string(),
       })),
+      note: z.string(),
       error: z.string().optional(),
     }),
 
@@ -34,7 +33,8 @@ Returns all active catalog items with their details.`,
         return {
           success: false,
           catalogName: "",
-          items: [],
+          grassTypes: [],
+          note: "",
           error: "Missing orgId in request context",
         };
       }
@@ -44,7 +44,8 @@ Returns all active catalog items with their details.`,
         return {
           success: false,
           catalogName: "",
-          items: [],
+          grassTypes: [],
+          note: "",
           error: "No active catalog found for this organization",
         };
       }
@@ -54,13 +55,13 @@ Returns all active catalog items with their details.`,
       return {
         success: true,
         catalogName: orgId,
-        items: items.map((i) => ({
+        grassTypes: items.map((i) => ({
           code: i.code,
           name: i.name,
           description: i.description,
-          pricePerUnit: i.pricePerUnit,
           unit: i.unit,
         })),
+        note: "El pricing varía según tipo de superficie (SOLADO/TIERRA) y m². Usa calculateBudget para precios exactos.",
       };
     },
   });

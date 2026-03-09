@@ -290,6 +290,24 @@ export interface QuoteLineItem {
   lineTotal: number;
 }
 
+export interface GrassComparisonRow {
+  grassName: string;
+  pricePerM2: number;
+  totalGrassInstalled: number;
+  traviesasTotal: number;
+  baseImponible: number;
+  iva: number;
+  totalConIva: number;
+}
+
+export interface GrassQuoteData {
+  areaM2: number;
+  surfaceType: "SOLADO" | "TIERRA";
+  perimeterLm: number;
+  rows: GrassComparisonRow[];
+  traviesasNote: string;
+}
+
 export interface Quote {
   id: string;
   orgId: string;
@@ -303,6 +321,11 @@ export interface Quote {
   total: string;
   pdfBase64: string | null;
   filename: string;
+  quoteData: GrassQuoteData | null;
+  surfaceType: string | null;
+  areaM2: string | null;
+  perimeterLm: string | null;
+  province: string | null;
   createdAt: Date;
 }
 
@@ -319,6 +342,11 @@ export interface NewQuote {
   total: string;
   pdfBase64?: string | null | undefined;
   filename: string;
+  quoteData?: GrassQuoteData | null | undefined;
+  surfaceType?: string | null | undefined;
+  areaM2?: string | null | undefined;
+  perimeterLm?: string | null | undefined;
+  province?: string | null | undefined;
   createdAt?: Date | undefined;
 }
 

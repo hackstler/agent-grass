@@ -264,6 +264,25 @@ export interface QuoteLineItemJson {
   lineTotal: number;
 }
 
+// ── Grass comparison JSONB types (stored in quotes.quoteData) ─────────────────
+export interface GrassComparisonRowJson {
+  grassName: string;
+  pricePerM2: number;
+  totalGrassInstalled: number;
+  traviesasTotal: number;
+  baseImponible: number;
+  iva: number;
+  totalConIva: number;
+}
+
+export interface GrassQuoteDataJson {
+  areaM2: number;
+  surfaceType: "SOLADO" | "TIERRA";
+  perimeterLm: number;
+  rows: GrassComparisonRowJson[];
+  traviesasNote: string;
+}
+
 export const quotes = pgTable("quotes", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: text("org_id").notNull(),
@@ -277,8 +296,32 @@ export const quotes = pgTable("quotes", {
   total: numeric("total", { precision: 10, scale: 2 }).notNull(),
   pdfBase64: text("pdf_base64"),
   filename: text("filename").notNull(),
+  quoteData: jsonb("quote_data").$type<GrassQuoteDataJson | null>(),
+  surfaceType: text("surface_type"),
+  areaM2: numeric("area_m2", { precision: 10, scale: 2 }),
+  perimeterLm: numeric("perimeter_lm", { precision: 10, scale: 2 }),
+  province: text("province"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ── Grass pricing lookup table (price/m² by grass type × surface × m²) ───────
+export const grassPricing = pgTable(
+  "grass_pricing",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catalogItemId: uuid("catalog_item_id")
+      .notNull()
+      .references(() => catalogItems.id, { onDelete: "cascade" }),
+    surfaceType: text("surface_type").notNull(), // "SOLADO" | "TIERRA"
+    m2: integer("m2").notNull(), // 1-650
+    pricePerM2: numeric("price_per_m2", { precision: 10, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    lookupIdx: index("grass_pricing_lookup_idx").on(t.catalogItemId, t.surfaceType, t.m2),
+    uniqueEntry: uniqueIndex("grass_pricing_unique_entry").on(t.catalogItemId, t.surfaceType, t.m2),
+  })
+);
 
 // Embedding dimension: 768 for Gemini gemini-embedding-001 (default)
 // 1536 for OpenAI text-embedding-3-small — set EMBEDDING_DIM env var to override
@@ -382,10 +425,18 @@ export const catalogsRelations = relations(catalogs, ({ many }) => ({
   items: many(catalogItems),
 }));
 
-export const catalogItemsRelations = relations(catalogItems, ({ one }) => ({
+export const catalogItemsRelations = relations(catalogItems, ({ one, many }) => ({
   catalog: one(catalogs, {
     fields: [catalogItems.catalogId],
     references: [catalogs.id],
+  }),
+  grassPrices: many(grassPricing),
+}));
+
+export const grassPricingRelations = relations(grassPricing, ({ one }) => ({
+  catalogItem: one(catalogItems, {
+    fields: [grassPricing.catalogItemId],
+    references: [catalogItems.id],
   }),
 }));
 
@@ -419,3 +470,5 @@ export type InvitationRow = typeof invitations.$inferSelect;
 export type NewInvitationRow = typeof invitations.$inferInsert;
 export type QuoteRow = typeof quotes.$inferSelect;
 export type NewQuoteRow = typeof quotes.$inferInsert;
+export type GrassPricingRow = typeof grassPricing.$inferSelect;
+export type NewGrassPricingRow = typeof grassPricing.$inferInsert;

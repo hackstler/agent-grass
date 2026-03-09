@@ -91,6 +91,7 @@ export function createMockOrgRepo(): {
   [K in keyof OrganizationRepository]: ReturnType<typeof vi.fn>;
 } {
   return {
+    findAll: vi.fn().mockResolvedValue([]),
     findByOrgId: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
