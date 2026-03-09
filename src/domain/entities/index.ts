@@ -175,6 +175,7 @@ export interface Organization {
   email: string | null;
   nif: string | null;
   logo: string | null;
+  web: string | null;
   vatRate: string | null;
   currency: string;
   features: OrgFeatures | null;
@@ -193,6 +194,7 @@ export interface NewOrganization {
   email?: string | null | undefined;
   nif?: string | null | undefined;
   logo?: string | null | undefined;
+  web?: string | null | undefined;
   vatRate?: string | null | undefined;
   currency?: string | undefined;
   features?: OrgFeatures | null | undefined;

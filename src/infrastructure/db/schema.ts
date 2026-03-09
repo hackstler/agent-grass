@@ -78,6 +78,7 @@ export const organizations = pgTable("organizations", {
   email: text("email"),
   nif: text("nif"),
   logo: text("logo"),
+  web: text("web"),
   vatRate: numeric("vat_rate", { precision: 5, scale: 4 }),
   currency: text("currency").notNull().default("€"),
   features: jsonb("features").$type<OrgFeatures>().default({}),
