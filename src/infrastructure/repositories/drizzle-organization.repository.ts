@@ -7,6 +7,10 @@ import type { Organization } from "../../domain/entities/index.js";
 import { NotFoundError } from "../../domain/errors/index.js";
 
 export class DrizzleOrganizationRepository implements OrganizationRepository {
+  async findAll(): Promise<Organization[]> {
+    return db.query.organizations.findMany();
+  }
+
   async findByOrgId(orgId: string): Promise<Organization | null> {
     const result = await db.query.organizations.findFirst({
       where: eq(organizations.orgId, orgId),
