@@ -8,7 +8,6 @@ export const quoteConfig = {
   companyPhone:   process.env["QUOTE_COMPANY_PHONE"]   ?? "+34 600 000 000",
   companyNif:     process.env["QUOTE_COMPANY_NIF"]     ?? "B-00000000",
   companyEmail:   process.env["QUOTE_COMPANY_EMAIL"]   ?? "info@tuempresa.com",
-  companyWeb:     process.env["QUOTE_COMPANY_WEB"]    ?? "www.tuempresa.com",
 
   vatRate: 0.21,
   currency: "€",

@@ -19,7 +19,7 @@ export interface CalculateBudgetDeps {
 
 /** Build CompanyDetails from org record, falling back to quoteConfig defaults. */
 function resolveCompanyDetails(
-  org: { name: string | null; address: string | null; phone: string | null; email: string | null; nif: string | null; logo: string | null; vatRate: string | null; currency: string } | null,
+  org: { name: string | null; address: string | null; phone: string | null; email: string | null; nif: string | null; logo: string | null; web: string | null; vatRate: string | null; currency: string } | null,
 ): CompanyDetails {
   return {
     name:     org?.name    ?? quoteConfig.companyName,
@@ -28,9 +28,9 @@ function resolveCompanyDetails(
     email:    org?.email   ?? quoteConfig.companyEmail,
     nif:      org?.nif     ?? quoteConfig.companyNif,
     logo:     org?.logo    ?? null,
+    web:      org?.web     ?? "",
     vatRate:  org?.vatRate  ? Number(org.vatRate) : quoteConfig.vatRate,
     currency: org?.currency ?? quoteConfig.currency,
-    web:      quoteConfig.companyWeb,
   };
 }
 
