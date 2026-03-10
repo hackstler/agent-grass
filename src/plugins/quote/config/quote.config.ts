@@ -15,7 +15,7 @@ export const quoteConfig = {
   traviesasPricePerLm: 20.20,  // €/metro lineal traviesas madera tratada
   quoteValidityDays: 60,
   paymentTerms: "La forma de pago será 50% a la aprobación del presupuesto y 50% a la finalización de la obra.",
-  companyRegistration: "",
+  companyRegistration: "Empresa registrada en el Registro Mercantil de Madrid, tomo 40.633, folio 165, hoja M-721056, inscripción 1.ª, NIF B01931237.",
   maxM2Lookup: 650,             // m² máximo en grass_pricing
 
   agentName: "QuoteAgent",

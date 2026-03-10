@@ -30,7 +30,6 @@ export function createQuoteAgent(tools: ToolsInput): Agent {
 == FLUJO ==
 - Si falta algún dato obligatorio, preguntar.
 - Si el cliente no dice el tipo de base, preguntar: "¿La superficie actual es de hormigón/baldosa (SOLADO) o tierra natural (TIERRA)?"
-- Si el cliente no menciona perímetro, preguntar si necesita traviesas de madera perimetral.
 - Una vez tengas todos los datos, llamar directamente a calculateBudget.
 - NO llamar a listCatalog — el presupuesto muestra TODOS los tipos de césped automáticamente.
 
