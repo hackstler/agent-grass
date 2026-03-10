@@ -183,4 +183,16 @@ export class CatalogManager {
     if (!deleted) throw new NotFoundError("CatalogItem", itemId);
     this.emitEvent("catalog:item:deleted", orgId, itemId, catalogId);
   }
+
+  async importPricing(
+    orgId: string,
+    catalogId: string,
+    items: { name: string; code: number; description: string; category: string; unit: string; sortOrder: number }[],
+    pricing: { grassName: string; surfaceType: string; m2: number; pricePerM2: number }[],
+  ): Promise<{ itemsCreated: number; pricingRows: number }> {
+    await this.getCatalog(orgId, catalogId); // verify ownership
+    const result = await this.repo.bulkImportPricing(catalogId, items, pricing);
+    this.emitEvent("catalog:updated", orgId, catalogId);
+    return result;
+  }
 }

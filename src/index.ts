@@ -33,7 +33,6 @@ import { GmailPlugin } from "./plugins/gmail/index.js";
 import { CalendarPlugin } from "./plugins/calendar/index.js";
 import { QuotePlugin } from "./plugins/quote/index.js";
 import { CatalogManagerPlugin } from "./plugins/catalog-manager/index.js";
-import { seedCatalog } from "./infrastructure/db/catalog-seed.js";
 import { OAuthManagerAdapter } from "./plugins/google-common/oauth-manager-adapter.js";
 
 // Shared stores
@@ -144,16 +143,6 @@ async function main() {
   await pluginRegistry.ensureTablesForAll();
 
   await seedAdminUser();
-
-  // Seed catalog for admin org
-  const adminOrgId = process.env["ADMIN_EMAIL"] ?? process.env["ADMIN_USERNAME"];
-  if (adminOrgId) {
-    try {
-      await seedCatalog(adminOrgId);
-    } catch (err) {
-      console.error("[seed:catalog] error (non-fatal):", err instanceof Error ? err.message : err);
-    }
-  }
 
   await pluginRegistry.initializeAll();
 

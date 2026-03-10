@@ -192,6 +192,8 @@ export function createMockCatalogRepo(): {
   [K in keyof CatalogRepository]: ReturnType<typeof vi.fn>;
 } {
   return {
+    findAll: vi.fn(),
+    findById: vi.fn(),
     findByOrgId: vi.fn(),
     findByOrgAndId: vi.fn(),
     create: vi.fn(),
@@ -204,6 +206,7 @@ export function createMockCatalogRepo(): {
     updateItem: vi.fn(),
     deleteItem: vi.fn(),
     nextCode: vi.fn(),
+    bulkImportPricing: vi.fn(),
   };
 }
 

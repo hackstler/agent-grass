@@ -5,8 +5,6 @@ import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
 interface GrassTypeEntry {
   name: string;
   code: number;
@@ -27,7 +25,8 @@ interface PricingData {
 }
 
 function loadPricingData(): PricingData {
-  const filePath = resolve(__dirname, "grass-pricing-data.json");
+  const dir = dirname(fileURLToPath(import.meta.url));
+  const filePath = resolve(dir, "grass-pricing-data.json");
   return JSON.parse(readFileSync(filePath, "utf-8")) as PricingData;
 }
 

@@ -27,4 +27,11 @@ export interface CatalogRepository {
   ): Promise<CatalogItem | null>;
   deleteItem(id: string): Promise<boolean>;
   nextCode(catalogId: string): Promise<number>;
+
+  // Bulk pricing import
+  bulkImportPricing(
+    catalogId: string,
+    items: { name: string; code: number; description: string; category: string; unit: string; sortOrder: number }[],
+    pricing: { grassName: string; surfaceType: string; m2: number; pricePerM2: number }[],
+  ): Promise<{ itemsCreated: number; pricingRows: number }>;
 }

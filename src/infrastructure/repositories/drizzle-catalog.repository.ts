@@ -1,6 +1,6 @@
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { catalogs, catalogItems } from "../db/schema.js";
+import { catalogs, catalogItems, grassPricing } from "../db/schema.js";
 import type { Catalog, NewCatalog, CatalogItem, NewCatalogItem } from "../db/schema.js";
 import type { CatalogRepository } from "../../domain/ports/repositories/catalog.repository.js";
 import { ConflictError } from "../../domain/errors/index.js";
@@ -133,5 +133,66 @@ export class DrizzleCatalogRepository implements CatalogRepository {
       .from(catalogItems)
       .where(eq(catalogItems.catalogId, catalogId));
     return (row?.maxCode ?? 0) + 1;
+  }
+
+  async bulkImportPricing(
+    catalogId: string,
+    items: { name: string; code: number; description: string; category: string; unit: string; sortOrder: number }[],
+    pricing: { grassName: string; surfaceType: string; m2: number; pricePerM2: number }[],
+  ): Promise<{ itemsCreated: number; pricingRows: number }> {
+    // 1. Delete existing pricing for this catalog's items
+    const existingItems = await db
+      .select({ id: catalogItems.id })
+      .from(catalogItems)
+      .where(eq(catalogItems.catalogId, catalogId));
+
+    if (existingItems.length > 0) {
+      const existingIds = existingItems.map((i) => i.id);
+      await db.delete(grassPricing).where(inArray(grassPricing.catalogItemId, existingIds));
+      await db.delete(catalogItems).where(eq(catalogItems.catalogId, catalogId));
+    }
+
+    // 2. Create catalog items
+    const itemRows = items.map((g) => ({
+      catalogId,
+      code: g.code,
+      name: g.name,
+      description: g.description,
+      category: g.category,
+      pricePerUnit: "0.00",
+      unit: g.unit,
+      sortOrder: g.sortOrder,
+    }));
+
+    const insertedItems = await db
+      .insert(catalogItems)
+      .values(itemRows)
+      .returning({ id: catalogItems.id, name: catalogItems.name });
+
+    // 3. Build name→id map
+    const nameToId = new Map<string, string>();
+    for (const item of insertedItems) {
+      nameToId.set(item.name, item.id);
+    }
+
+    // 4. Bulk insert pricing in batches
+    const BATCH_SIZE = 500;
+    const pricingRows = pricing
+      .filter((p) => nameToId.has(p.grassName))
+      .map((p) => ({
+        catalogItemId: nameToId.get(p.grassName)!,
+        surfaceType: p.surfaceType,
+        m2: p.m2,
+        pricePerM2: String(p.pricePerM2),
+      }));
+
+    let inserted = 0;
+    for (let i = 0; i < pricingRows.length; i += BATCH_SIZE) {
+      const batch = pricingRows.slice(i, i + BATCH_SIZE);
+      await db.insert(grassPricing).values(batch);
+      inserted += batch.length;
+    }
+
+    return { itemsCreated: insertedItems.length, pricingRows: inserted };
   }
 }

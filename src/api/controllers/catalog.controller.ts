@@ -37,6 +37,23 @@ const updateItemValidator = z.object({
   isActive: z.boolean().optional(),
 });
 
+const pricingImportValidator = z.object({
+  grassTypes: z.array(z.object({
+    name: z.string().min(1),
+    code: z.number().int().positive(),
+    description: z.string().default(""),
+    sortOrder: z.number().int().nonnegative().default(0),
+    category: z.string().default("césped artificial"),
+    unit: z.string().default("m²"),
+  })),
+  pricing: z.array(z.object({
+    grassName: z.string().min(1),
+    surfaceType: z.enum(["SOLADO", "TIERRA"]),
+    m2: z.number().int().positive(),
+    pricePerM2: z.number().positive(),
+  })),
+});
+
 export function createCatalogController(manager: CatalogManager, orgRepo?: OrganizationRepository): Hono {
   const router = new Hono();
 
@@ -212,6 +229,25 @@ export function createCatalogController(manager: CatalogManager, orgRepo?: Organ
     const orgId = await resolveOrgId(user, catalogId);
     await manager.deleteItem(orgId, catalogId, itemId);
     return c.json({ id: itemId });
+  });
+
+  // ── Pricing bulk import ─────────────────────────────────────────────────
+  router.post("/:catalogId/pricing/import", async (c) => {
+    const user = c.get("user");
+    if (!user?.orgId) return c.json({ error: "Unauthorized", message: "No orgId in token" }, 401);
+
+    const catalogId = c.req.param("catalogId");
+    const orgId = await resolveOrgId(user, catalogId);
+
+    // Verify catalog ownership
+    await manager.getCatalog(orgId, catalogId);
+
+    const body = await c.req.json().catch(() => null);
+    const parsed = pricingImportValidator.safeParse(body);
+    if (!parsed.success) return c.json({ error: "Validation", message: parsed.error.message }, 400);
+
+    const result = await manager.importPricing(orgId, catalogId, parsed.data.grassTypes, parsed.data.pricing);
+    return c.json({ data: result });
   });
 
   return router;
