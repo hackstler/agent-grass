@@ -179,7 +179,14 @@ export function createCatalogController(manager: CatalogManager, orgRepo?: Organ
     const catalogId = c.req.param("catalogId");
     const orgId = await resolveOrgId(user, catalogId);
     const rows = await manager.listItems(orgId, catalogId);
-    return c.json({ items: rows, total: rows.length });
+    const priceRanges = await manager.getItemPriceRanges(catalogId);
+
+    const enriched = rows.map((item) => {
+      const range = priceRanges.get(item.id);
+      return range ? { ...item, priceRange: range } : item;
+    });
+
+    return c.json({ items: enriched, total: enriched.length });
   });
 
   router.post("/:catalogId/items", async (c) => {

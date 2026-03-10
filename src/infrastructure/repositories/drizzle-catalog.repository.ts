@@ -135,6 +135,45 @@ export class DrizzleCatalogRepository implements CatalogRepository {
     return (row?.maxCode ?? 0) + 1;
   }
 
+  async getItemPriceRanges(catalogId: string): Promise<Map<string, {
+    solado?: { min: number; max: number };
+    tierra?: { min: number; max: number };
+  }>> {
+    const rows = await db
+      .select({
+        catalogItemId: grassPricing.catalogItemId,
+        surfaceType: grassPricing.surfaceType,
+        minPrice: sql<string>`min(${grassPricing.pricePerM2})`,
+        maxPrice: sql<string>`max(${grassPricing.pricePerM2})`,
+      })
+      .from(grassPricing)
+      .where(
+        inArray(
+          grassPricing.catalogItemId,
+          db.select({ id: catalogItems.id }).from(catalogItems).where(eq(catalogItems.catalogId, catalogId)),
+        ),
+      )
+      .groupBy(grassPricing.catalogItemId, grassPricing.surfaceType);
+
+    const result = new Map<string, {
+      solado?: { min: number; max: number };
+      tierra?: { min: number; max: number };
+    }>();
+
+    for (const row of rows) {
+      const existing = result.get(row.catalogItemId) ?? {};
+      const range = { min: Number(row.minPrice), max: Number(row.maxPrice) };
+      if (row.surfaceType === "SOLADO") {
+        existing.solado = range;
+      } else if (row.surfaceType === "TIERRA") {
+        existing.tierra = range;
+      }
+      result.set(row.catalogItemId, existing);
+    }
+
+    return result;
+  }
+
   async bulkImportPricing(
     catalogId: string,
     items: { name: string; code: number; description: string; category: string; unit: string; sortOrder: number }[],

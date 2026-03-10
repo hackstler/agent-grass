@@ -184,6 +184,13 @@ export class CatalogManager {
     this.emitEvent("catalog:item:deleted", orgId, itemId, catalogId);
   }
 
+  async getItemPriceRanges(catalogId: string): Promise<Map<string, {
+    solado?: { min: number; max: number };
+    tierra?: { min: number; max: number };
+  }>> {
+    return this.repo.getItemPriceRanges(catalogId);
+  }
+
   async importPricing(
     orgId: string,
     catalogId: string,

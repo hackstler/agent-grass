@@ -28,6 +28,12 @@ export interface CatalogRepository {
   deleteItem(id: string): Promise<boolean>;
   nextCode(catalogId: string): Promise<number>;
 
+  // Price ranges from grass_pricing
+  getItemPriceRanges(catalogId: string): Promise<Map<string, {
+    solado?: { min: number; max: number };
+    tierra?: { min: number; max: number };
+  }>>;
+
   // Bulk pricing import
   bulkImportPricing(
     catalogId: string,
