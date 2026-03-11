@@ -320,9 +320,9 @@ export class PdfService {
     // ── Title ─────────────────────────────────────────────────────────────
     page.drawText("PRESUPUESTO CÉSPED ARTIFICIAL", {
       x: M, y,
-      font: bold, size: 16, color: C.black,
+      font: bold, size: 12, color: rgb(0, 0, 0),
     });
-    y -= 24;
+    y -= 20;
 
     // ── Client details (label:value aligned) ──────────────────────────────
     const labelRightX = M + 80;

@@ -18,7 +18,7 @@ export async function contextualizeChunks(
   if (!apiKey) throw new Error("GOOGLE_API_KEY is required for contextualization");
 
   const google = new GoogleGenerativeAI(apiKey);
-  const model = google.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = google.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   // Truncate document to fit in context window
   const truncatedDoc =
