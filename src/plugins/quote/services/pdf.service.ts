@@ -37,6 +37,7 @@ export interface ComparisonRow {
   grassName: string;
   pricePerM2: number;
   totalGrassInstalled: number;
+  aridosTotal: number;
   traviesasTotal: number;
   baseImponible: number;
   iva: number;
@@ -53,6 +54,7 @@ export interface ComparisonPdfData {
   areaM2: number;
   surfaceType: "SOLADO" | "TIERRA";
   perimeterLm: number;
+  sacasAridos: number;
   rows: ComparisonRow[];
 }
 
@@ -272,6 +274,7 @@ export class PdfService {
       }
     }
 
+    let logoBottomY = y; // track where the logo ends
     if (logoImage) {
       const dims = logoImage.scale(1);
       const maxH = 70;
@@ -285,6 +288,7 @@ export class PdfService {
         width: lw,
         height: lh,
       });
+      logoBottomY = y - lh;
     }
 
     // ── Contact info (top-right) ──────────────────────────────────────────
@@ -309,6 +313,9 @@ export class PdfService {
       font: regular, size: 9, color: C.darkGray,
     });
     y -= 24;
+
+    // Fix: ensure y is below the logo before drawing the title
+    y = Math.min(y, logoBottomY - 8);
 
     // ── Title ─────────────────────────────────────────────────────────────
     page.drawText("PRESUPUESTO CÉSPED ARTIFICIAL", {
@@ -369,18 +376,19 @@ export class PdfService {
 
     // ── Table ─────────────────────────────────────────────────────────────
     const cols = [
-      { x: M,       w: 80  },  // grass name
-      { x: M + 80,  w: 110 },  // Precio M2
-      { x: M + 190, w: 120 },  // Total Césped
-      { x: M + 310, w: 120 },  // Traviesas
-      { x: M + 430, w: 110 },  // Base Imp.
-      { x: M + 540, w: 100 },  // IVA
+      { x: M,       w: 70  },  // grass name
+      { x: M + 70,  w: 95  },  // Precio M2
+      { x: M + 165, w: 100 },  // Total Césped
+      { x: M + 265, w: 85  },  // Áridos
+      { x: M + 350, w: 100 },  // Traviesas
+      { x: M + 450, w: 100 },  // Base Imp.
+      { x: M + 550, w: 90  },  // IVA
       { x: M + 640, w: 130 },  // TOTAL
     ];
 
     // Two-line header
-    const headers1 = ["", "Precio M2", "Total Césped", "Traviesas", "Base", "IVA", "TOTAL"];
-    const headers2 = ["", "Todo Incluido", "Instalado", "madera incl.", "Imponible", "(21%)", "IVA INCLUIDO"];
+    const headers1 = ["", "Precio M2", "Total Césped", "Áridos", "Traviesas", "Base", "IVA", "TOTAL"];
+    const headers2 = ["", "Todo Incluido", "Instalado", "", "madera incl.", "Imponible", "(21%)", "IVA INCLUIDO"];
 
     page.drawRectangle({ x: M, y: y - 8, width: tableW, height: 26, color: C.lightGray });
     for (let c = 0; c < cols.length; c++) {
@@ -410,6 +418,7 @@ export class PdfService {
         row.grassName,
         fmt(row.pricePerM2, currency),
         fmt(row.totalGrassInstalled, currency),
+        fmt(row.aridosTotal, currency),
         fmt(row.traviesasTotal, currency),
         fmt(row.baseImponible, currency),
         fmt(row.iva, currency),
@@ -432,13 +441,23 @@ export class PdfService {
     y -= 6;
     page.drawLine({ start: { x: M, y }, end: { x: LW - M, y }, thickness: 0.5, color: C.midGray });
 
-    // ── Note (traviesas) ──────────────────────────────────────────────────
+    // ── Notes (traviesas + áridos) ──────────────────────────────────────
     y -= 14;
-    const perimeterStr = data.perimeterLm.toFixed(1).replace(".", ",");
-    page.drawText(`*Traviesa de madera instalada en todo el perímetro ${perimeterStr} ml`, {
-      x: M, y,
-      font: regular, size: 8, color: C.darkGray,
-    });
+    if (data.perimeterLm > 0) {
+      const perimeterStr = data.perimeterLm.toFixed(1).replace(".", ",");
+      page.drawText(`*Traviesa de madera instalada en todo el perímetro ${perimeterStr} ml`, {
+        x: M, y,
+        font: regular, size: 8, color: C.darkGray,
+      });
+      y -= 12;
+    }
+    if (data.sacasAridos > 0) {
+      page.drawText(`*Contempladas ${data.sacasAridos} sacas de zahorra para preparación de la base`, {
+        x: M, y,
+        font: regular, size: 8, color: C.darkGray,
+      });
+      y -= 12;
+    }
 
     // ── Legal texts (bottom, italic) ──────────────────────────────────────
     let legalY = M + 36;

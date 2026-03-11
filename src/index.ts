@@ -85,7 +85,6 @@ const oauthManager = new OAuthManager(oauthTokenRepo, tokenEncryption);
 const pluginRegistry = new PluginRegistry();
 const ragPlugin = new RagPlugin();
 pluginRegistry.register(ragPlugin);
-pluginRegistry.register(new YouTubePlugin());
 
 const oauthProvider = new OAuthManagerAdapter(oauthManager);
 const attachmentStore = new InMemoryAttachmentStore();

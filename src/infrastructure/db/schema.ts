@@ -270,6 +270,7 @@ export interface GrassComparisonRowJson {
   grassName: string;
   pricePerM2: number;
   totalGrassInstalled: number;
+  aridosTotal: number;
   traviesasTotal: number;
   baseImponible: number;
   iva: number;
@@ -280,8 +281,10 @@ export interface GrassQuoteDataJson {
   areaM2: number;
   surfaceType: "SOLADO" | "TIERRA";
   perimeterLm: number;
+  sacasAridos: number;
   rows: GrassComparisonRowJson[];
   traviesasNote: string;
+  aridosNote?: string;
 }
 
 export const quotes = pgTable("quotes", {

@@ -43,12 +43,19 @@ Required: client name, address, area in m², surface type (SOLADO or TIERRA), pe
 Returns a table with pricing for each grass type and generates a comparison PDF.`,
 
     inputSchema: z.object({
-      clientName: z.string().describe("Full name of the client"),
-      clientAddress: z.string().describe("Address of the client"),
+      clientName: z.string().min(3).refine(
+        (v) => !["cliente", "desconocido", "unknown", "n/a"].includes(v.toLowerCase().trim()),
+        { message: "Client name must be a real name, not a placeholder. Ask the seller for the actual client name." },
+      ).describe("Full name of the client (real name, not generic)"),
+      clientAddress: z.string().min(10).refine(
+        (v) => !["desconocida", "unknown", "n/a", "sin dirección", "sin direccion"].includes(v.toLowerCase().trim()),
+        { message: "Client address must be a real address, not a placeholder. Ask the seller for the actual address." },
+      ).describe("Full address of the client (real address, at least street and number)"),
       province: z.string().optional().describe("Province (e.g. Madrid, Toledo)"),
       areaM2: z.number().positive().describe("Surface area in square meters"),
       surfaceType: z.enum(["SOLADO", "TIERRA"]).describe("SOLADO = concrete/tiles, TIERRA = natural ground"),
-      perimeterLm: z.number().nonnegative().describe("Perimeter in linear meters (for wooden borders). 0 if none needed"),
+      perimeterLm: z.number().nonnegative().default(0).describe("Perimeter in linear meters (for wooden borders). 0 if none needed"),
+      sacasAridos: z.number().nonnegative().default(0).describe("Number of zahorra bags for ground preparation. Only for TIERRA. 0 if none needed"),
       applyVat: z.boolean().default(true).describe("Whether to include 21% VAT"),
     }),
 
@@ -67,7 +74,7 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
       error: z.string().optional(),
     }),
 
-    execute: async ({ clientName, clientAddress, province, areaM2, surfaceType, perimeterLm, applyVat }, context) => {
+    execute: async ({ clientName, clientAddress, province, areaM2, surfaceType, perimeterLm, sacasAridos, applyVat }, context) => {
       const orgId = context?.requestContext?.get("orgId") as string | undefined;
       if (!orgId) {
         return {
@@ -103,19 +110,21 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
         };
       }
 
-      // Calculate traviesas cost
+      // Calculate traviesas and áridos costs
       const traviesasCost = Math.round(perimeterLm * quoteConfig.traviesasPricePerLm * 100) / 100;
+      const aridosCost = Math.round(sacasAridos * quoteConfig.aridosPricePerSaca * 100) / 100;
 
       // Build comparison rows
       const comparisonRows: GrassComparisonRowJson[] = grassPrices.map((gp) => {
         const totalGrassInstalled = Math.round(gp.pricePerM2 * areaM2 * 100) / 100;
-        const baseImponible = Math.round((totalGrassInstalled + traviesasCost) * 100) / 100;
+        const baseImponible = Math.round((totalGrassInstalled + aridosCost + traviesasCost) * 100) / 100;
         const iva = applyVat ? Math.round(baseImponible * company.vatRate * 100) / 100 : 0;
         const totalConIva = Math.round((baseImponible + iva) * 100) / 100;
         return {
           grassName: gp.grassName,
           pricePerM2: gp.pricePerM2,
           totalGrassInstalled,
+          aridosTotal: aridosCost,
           traviesasTotal: traviesasCost,
           baseImponible,
           iva,
@@ -140,6 +149,7 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
         areaM2,
         surfaceType,
         perimeterLm,
+        sacasAridos,
         rows: comparisonRows,
       });
 
@@ -159,8 +169,10 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
         areaM2,
         surfaceType,
         perimeterLm,
+        sacasAridos,
         rows: comparisonRows,
         traviesasNote: `Traviesa madera tratada: ${perimeterLm} ml × ${quoteConfig.traviesasPricePerLm} €/ml`,
+        ...(sacasAridos > 0 && { aridosNote: `Zahorra: ${sacasAridos} sacas × ${quoteConfig.aridosPricePerSaca} €/saca` }),
       };
 
       // Use the cheapest row's total as the "representative" quote total for backward compat

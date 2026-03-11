@@ -296,6 +296,7 @@ export interface GrassComparisonRow {
   grassName: string;
   pricePerM2: number;
   totalGrassInstalled: number;
+  aridosTotal: number;
   traviesasTotal: number;
   baseImponible: number;
   iva: number;
@@ -306,8 +307,10 @@ export interface GrassQuoteData {
   areaM2: number;
   surfaceType: "SOLADO" | "TIERRA";
   perimeterLm: number;
+  sacasAridos: number;
   rows: GrassComparisonRow[];
   traviesasNote: string;
+  aridosNote?: string;
 }
 
 export interface Quote {

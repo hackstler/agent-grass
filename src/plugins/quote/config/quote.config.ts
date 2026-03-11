@@ -13,6 +13,7 @@ export const quoteConfig = {
   currency: "€",
 
   traviesasPricePerLm: 20.20,  // €/metro lineal traviesas madera tratada
+  aridosPricePerSaca: 42,      // €/saca de zahorra para preparación de base
   quoteValidityDays: 60,
   paymentTerms: "La forma de pago será 50% a la aprobación del presupuesto y 50% a la finalización de la obra.",
   companyRegistration: "Empresa registrada en el Registro Mercantil de Madrid, tomo 40.633, folio 165, hoja M-721056, inscripción 1.ª, NIF B01931237.",
