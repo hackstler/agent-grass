@@ -17,29 +17,43 @@ export interface GrassPriceResult {
   pricePerM2: number;
 }
 
+export interface ActiveCatalog {
+  id: string;
+  businessType: string;
+}
+
 export class CatalogService {
   /**
-   * Returns the ID of the single active catalog for the given org.
+   * Returns the ID and businessType of the single active catalog for the given org.
    * Falls back to any active catalog if the org has none (single-tenant convenience).
    */
-  async getActiveCatalogId(orgId: string): Promise<string | null> {
+  async getActiveCatalog(orgId: string): Promise<ActiveCatalog | null> {
     // Try org-specific first
     const [orgCatalog] = await db
-      .select({ id: catalogs.id })
+      .select({ id: catalogs.id, businessType: catalogs.businessType })
       .from(catalogs)
       .where(and(eq(catalogs.orgId, orgId), eq(catalogs.isActive, true)))
       .limit(1);
 
-    if (orgCatalog) return orgCatalog.id;
+    if (orgCatalog) return orgCatalog;
 
     // Fallback: any active catalog (single-tenant deployments)
     const [fallbackCatalog] = await db
-      .select({ id: catalogs.id })
+      .select({ id: catalogs.id, businessType: catalogs.businessType })
       .from(catalogs)
       .where(eq(catalogs.isActive, true))
       .limit(1);
 
-    return fallbackCatalog?.id ?? null;
+    return fallbackCatalog ?? null;
+  }
+
+  /**
+   * @deprecated Use getActiveCatalog() instead — returns businessType too.
+   * Kept for backward compatibility with listCatalog tool.
+   */
+  async getActiveCatalogId(orgId: string): Promise<string | null> {
+    const catalog = await this.getActiveCatalog(orgId);
+    return catalog?.id ?? null;
   }
 
   /**

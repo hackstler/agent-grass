@@ -337,7 +337,7 @@ export interface Quote {
   total: string;
   pdfBase64: string | null;
   filename: string;
-  quoteData: GrassQuoteData | null;
+  quoteData: Record<string, unknown> | null;
   surfaceType: string | null;
   areaM2: string | null;
   perimeterLm: string | null;
@@ -358,7 +358,7 @@ export interface NewQuote {
   total: string;
   pdfBase64?: string | null | undefined;
   filename: string;
-  quoteData?: GrassQuoteData | null | undefined;
+  quoteData?: Record<string, unknown> | null | undefined;
   surfaceType?: string | null | undefined;
   areaM2?: string | null | undefined;
   perimeterLm?: string | null | undefined;
