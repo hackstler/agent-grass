@@ -37,12 +37,14 @@ export class InvitationManager {
     const invitationId = randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
+    const normalizedEmail = email?.trim().toLowerCase() || null;
+
     const payload: InvitationTokenPayload = {
       type: "invitation",
       invitationId,
       orgId,
       role,
-      ...(email ? { email } : {}),
+      ...(normalizedEmail ? { email: normalizedEmail } : {}),
     };
 
     const token = sign(payload, this.jwtSecret, { expiresIn: "7d" } as jwt.SignOptions);
@@ -52,7 +54,7 @@ export class InvitationManager {
       id: invitationId,
       orgId,
       role,
-      email: email ?? null,
+      email: normalizedEmail,
       tokenHash,
       createdBy: callerUserId,
       expiresAt,

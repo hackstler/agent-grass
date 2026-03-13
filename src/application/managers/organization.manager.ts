@@ -95,37 +95,56 @@ export class OrganizationManager {
 
   async getByOrgId(orgId: string): Promise<Organization> {
     const org = await this.orgRepo.findByOrgId(orgId);
-    if (!org) throw new NotFoundError("Organization", orgId);
-    return org;
+    if (org) return org;
+
+    // Auto-heal: if users exist with this orgId but no organizations row, create it
+    const user = await this.userRepo.findFirstByOrg(orgId);
+    if (user) {
+      return this.orgRepo.create({ orgId, name: orgId, email: user.email });
+    }
+
+    throw new NotFoundError("Organization", orgId);
   }
 
   async update(orgId: string, _callerOrgId: string, data: UpdateOrgDto): Promise<Organization> {
-    return this.orgRepo.update(orgId, data);
+    // Normalize string fields before persisting
+    const normalized: UpdateOrgDto = { ...data };
+    if (normalized.slug !== undefined) normalized.slug = normalized.slug?.trim() || null;
+    if (normalized.name !== undefined) normalized.name = normalized.name?.trim() || null;
+    if (normalized.address !== undefined) normalized.address = normalized.address?.trim() || null;
+    if (normalized.phone !== undefined) normalized.phone = normalized.phone?.trim() || null;
+    if (normalized.email !== undefined) normalized.email = normalized.email?.trim().toLowerCase() || null;
+    if (normalized.nif !== undefined) normalized.nif = normalized.nif?.trim() || null;
+    if (normalized.currency !== undefined) normalized.currency = normalized.currency?.trim();
+    return this.orgRepo.update(orgId, normalized);
   }
 
   async create(dto: CreateOrgDto): Promise<{ orgId: string; admin: Record<string, unknown> }> {
+    const orgId = dto.orgId.trim();
+    const adminEmail = dto.adminEmail.trim().toLowerCase();
+
     // Check both users and organizations tables for existing orgId
     const [existingOrgRow, existingOrgUser] = await Promise.all([
-      this.orgRepo.findByOrgId(dto.orgId),
-      this.userRepo.findFirstByOrg(dto.orgId),
+      this.orgRepo.findByOrgId(orgId),
+      this.userRepo.findFirstByOrg(orgId),
     ]);
-    if (existingOrgRow || existingOrgUser) throw new ConflictError("Organization", `orgId '${dto.orgId}'`);
+    if (existingOrgRow || existingOrgUser) throw new ConflictError("Organization", `orgId '${orgId}'`);
 
-    const existingUser = await this.userRepo.findByEmail(dto.adminEmail);
-    if (existingUser) throw new ConflictError("User", `email '${dto.adminEmail}'`);
+    const existingUser = await this.userRepo.findByEmail(adminEmail);
+    if (existingUser) throw new ConflictError("User", `email '${adminEmail}'`);
 
     // Create the organizations row
     await this.orgRepo.create({
-      orgId: dto.orgId,
-      slug: dto.slug,
-      name: dto.name,
-      address: dto.address,
-      phone: dto.phone,
-      email: dto.email,
-      nif: dto.nif,
+      orgId,
+      slug: dto.slug?.trim(),
+      name: dto.name?.trim(),
+      address: dto.address?.trim(),
+      phone: dto.phone?.trim(),
+      email: dto.email?.trim().toLowerCase(),
+      nif: dto.nif?.trim(),
       logo: dto.logo,
       vatRate: dto.vatRate,
-      currency: dto.currency,
+      currency: dto.currency?.trim(),
       features: dto.features,
     });
 
@@ -139,14 +158,14 @@ export class OrganizationManager {
     }
 
     const admin = await this.userRepo.create({
-      email: dto.adminEmail,
-      orgId: dto.orgId,
+      email: adminEmail,
+      orgId,
       role: "admin",
       metadata,
     });
 
     return {
-      orgId: dto.orgId,
+      orgId,
       admin: {
         id: admin.id,
         email: admin.email,

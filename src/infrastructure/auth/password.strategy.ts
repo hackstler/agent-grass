@@ -17,7 +17,8 @@ export class PasswordStrategy implements AuthStrategy {
     }
 
     const { email, password } = credentials;
-    const user = await this.userRepo.findByEmail(email);
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.userRepo.findByEmail(normalizedEmail);
     if (!user) throw new UnauthorizedError("Invalid credentials");
 
     const meta = user.metadata as { passwordHash?: string } | null;
@@ -33,6 +34,6 @@ export class PasswordStrategy implements AuthStrategy {
   }
 
   hashPassword(password: string): string {
-    return createHash("sha256").update(`${this.salt}:${password}`).digest("hex");
+    return createHash("sha256").update(`${this.salt}:${password.trim()}`).digest("hex");
   }
 }

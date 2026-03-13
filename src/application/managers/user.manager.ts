@@ -68,6 +68,18 @@ export class UserManager {
     private readonly strategy: AuthStrategy,
   ) {}
 
+  /** Normalize email for storage and lookup — case-insensitive, no whitespace. */
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  /** Trim optional string fields (names, etc). */
+  private trimOrNull(value: string | null | undefined): string | null {
+    if (value == null) return null;
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+
   async register(
     dto: RegisterUserDto,
     callerRole?: string,
@@ -79,15 +91,17 @@ export class UserManager {
       throw new ForbiddenError("Only admins can create users");
     }
 
-    const existing = await this.repo.findByEmail(dto.email);
-    if (existing) throw new ConflictError("User", `email '${dto.email}'`);
+    const email = this.normalizeEmail(dto.email);
+    const existing = await this.repo.findByEmail(email);
+    if (existing) throw new ConflictError("User", `email '${email}'`);
 
     const role = isFirstUser ? "super_admin" : (dto.role ?? "user");
+    const orgId = dto.orgId?.trim() || email;
     const user = await this.repo.create({
-      email: dto.email,
-      name: dto.name ?? null,
-      surname: dto.surname ?? null,
-      orgId: dto.orgId ?? dto.email,
+      email,
+      name: this.trimOrNull(dto.name),
+      surname: this.trimOrNull(dto.surname),
+      orgId,
       role,
       metadata: { passwordHash: this.strategy.hashPassword!(dto.password) },
     });
@@ -99,8 +113,9 @@ export class UserManager {
     email: string,
     password: string,
   ): Promise<{ user: User; role: "admin" | "user" | "super_admin" }> {
-    const result = await this.strategy.authenticate({ type: "password", email, password });
-    const user = await this.repo.findByEmail(result.email);
+    const normalized = this.normalizeEmail(email);
+    const result = await this.strategy.authenticate({ type: "password", email: normalized, password });
+    const user = await this.repo.findByEmail(this.normalizeEmail(result.email));
     if (!user) throw new UnauthorizedError("Invalid credentials");
     return { user, role: user.role };
   }
@@ -125,15 +140,16 @@ export class UserManager {
   }
 
   async create(dto: CreateUserDto): Promise<UserListItem> {
-    const existing = await this.repo.findByEmail(dto.email);
-    if (existing) throw new ConflictError("User", `email '${dto.email}'`);
+    const email = this.normalizeEmail(dto.email);
+    const existing = await this.repo.findByEmail(email);
+    if (existing) throw new ConflictError("User", `email '${email}'`);
 
     const role = dto.role ?? "user";
     const user = await this.repo.create({
-      email: dto.email,
-      name: dto.name ?? null,
-      surname: dto.surname ?? null,
-      orgId: dto.orgId,
+      email,
+      name: this.trimOrNull(dto.name),
+      surname: this.trimOrNull(dto.surname),
+      orgId: dto.orgId.trim(),
       role,
       metadata: { passwordHash: this.strategy.hashPassword!(dto.password) },
     });
@@ -160,19 +176,20 @@ export class UserManager {
   async findByEmailWithRole(
     email: string,
   ): Promise<{ user: User; role: "admin" | "user" | "super_admin" } | null> {
-    const user = await this.repo.findByEmail(email);
+    const user = await this.repo.findByEmail(this.normalizeEmail(email));
     if (!user) return null;
     return { user, role: user.role };
   }
 
   async invite(dto: InviteUserDto): Promise<UserListItem> {
-    const existing = await this.repo.findByEmail(dto.email);
-    if (existing) throw new ConflictError("User", `email '${dto.email}'`);
+    const email = this.normalizeEmail(dto.email);
+    const existing = await this.repo.findByEmail(email);
+    if (existing) throw new ConflictError("User", `email '${email}'`);
 
     const role = dto.role ?? "user";
     const user = await this.repo.create({
-      email: dto.email,
-      orgId: dto.orgId,
+      email,
+      orgId: dto.orgId.trim(),
       role,
       metadata: { authStrategy: "firebase" },
     });
@@ -216,8 +233,9 @@ export class UserManager {
     }
 
     // Email conflict check
-    if (dto.email && dto.email !== existingUser.email) {
-      const existing = await this.repo.findByEmail(dto.email);
+    const normalizedEmail = dto.email ? this.normalizeEmail(dto.email) : undefined;
+    if (normalizedEmail && normalizedEmail !== existingUser.email) {
+      const existing = await this.repo.findByEmail(normalizedEmail);
       if (existing) throw new Error("Email already in use");
     }
 
@@ -228,11 +246,11 @@ export class UserManager {
 
     // Build update payload
     const updateData: Record<string, unknown> = {};
-    if (dto.email) updateData["email"] = dto.email;
-    if (dto.name !== undefined) updateData["name"] = dto.name;
-    if (dto.surname !== undefined) updateData["surname"] = dto.surname;
+    if (normalizedEmail) updateData["email"] = normalizedEmail;
+    if (dto.name !== undefined) updateData["name"] = this.trimOrNull(dto.name);
+    if (dto.surname !== undefined) updateData["surname"] = this.trimOrNull(dto.surname);
     if (dto.role) updateData["role"] = dto.role;
-    if (dto.orgId) updateData["orgId"] = dto.orgId;
+    if (dto.orgId) updateData["orgId"] = dto.orgId.trim();
     if (dto.password) {
       updateData["metadata"] = {
         ...(existingUser.metadata ?? {}),
@@ -255,25 +273,26 @@ export class UserManager {
   }
 
   async registerWithInvite(dto: RegisterWithInviteDto): Promise<{ user: User; role: string }> {
-    const existing = await this.repo.findByEmail(dto.email);
-    if (existing) throw new ConflictError("User", `email '${dto.email}'`);
+    const email = this.normalizeEmail(dto.email);
+    const existing = await this.repo.findByEmail(email);
+    if (existing) throw new ConflictError("User", `email '${email}'`);
 
     const role = (dto.role as "admin" | "user" | "super_admin") ?? "user";
     const metadata: Record<string, unknown> = {
       authStrategy: this.strategy.name,
       onboardingComplete: false,
     };
-    if (dto.firstName) metadata["firstName"] = dto.firstName;
-    if (dto.lastName) metadata["lastName"] = dto.lastName;
+    if (dto.firstName) metadata["firstName"] = dto.firstName.trim();
+    if (dto.lastName) metadata["lastName"] = dto.lastName.trim();
     if (dto.password && this.strategy.supportsPasswordManagement()) {
       metadata["passwordHash"] = this.strategy.hashPassword!(dto.password);
     }
 
     const user = await this.repo.create({
-      email: dto.email,
-      name: dto.firstName ?? null,
-      surname: dto.lastName ?? null,
-      orgId: dto.orgId,
+      email,
+      name: this.trimOrNull(dto.firstName),
+      surname: this.trimOrNull(dto.lastName),
+      orgId: dto.orgId.trim(),
       role,
       metadata,
     });
@@ -296,8 +315,9 @@ export class UserManager {
     const existingUser = await this.repo.findById(userId);
     if (!existingUser) throw new Error("User not found");
 
-    if (dto.email && dto.email !== existingUser.email) {
-      const existing = await this.repo.findByEmail(dto.email);
+    const normalizedEmail = dto.email ? this.normalizeEmail(dto.email) : undefined;
+    if (normalizedEmail && normalizedEmail !== existingUser.email) {
+      const existing = await this.repo.findByEmail(normalizedEmail);
       if (existing) throw new Error("Email already in use");
     }
 
@@ -307,16 +327,16 @@ export class UserManager {
     }
 
     const updateData: Record<string, unknown> = {};
-    if (dto.email) updateData["email"] = dto.email;
-    if (dto.name !== undefined) updateData["name"] = dto.name;
-    if (dto.surname !== undefined) updateData["surname"] = dto.surname;
+    if (normalizedEmail) updateData["email"] = normalizedEmail;
+    if (dto.name !== undefined) updateData["name"] = this.trimOrNull(dto.name);
+    if (dto.surname !== undefined) updateData["surname"] = this.trimOrNull(dto.surname);
 
     // Merge metadata fields
     const metadataUpdates: Record<string, unknown> = {};
     if (dto.password) metadataUpdates["passwordHash"] = this.strategy.hashPassword!(dto.password);
     if (dto.onboardingComplete !== undefined) metadataUpdates["onboardingComplete"] = dto.onboardingComplete;
-    if (dto.firstName !== undefined) metadataUpdates["firstName"] = dto.firstName;
-    if (dto.lastName !== undefined) metadataUpdates["lastName"] = dto.lastName;
+    if (dto.firstName !== undefined) metadataUpdates["firstName"] = dto.firstName?.trim() ?? null;
+    if (dto.lastName !== undefined) metadataUpdates["lastName"] = dto.lastName?.trim() ?? null;
 
     if (Object.keys(metadataUpdates).length > 0) {
       updateData["metadata"] = {

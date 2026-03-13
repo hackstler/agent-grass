@@ -51,6 +51,7 @@ describe("OrganizationManager", () => {
       expect(result).toEqual([
         {
           orgId: "org-1",
+          name: null,
           userCount: 2,
           docCount: 5,
           createdAt: "2025-01-01T00:00:00.000Z",
@@ -92,12 +93,14 @@ describe("OrganizationManager", () => {
       expect(result.name).toBe("Acme Updated");
     });
 
-    it("throws ForbiddenError when caller does not own the org", async () => {
-      await expect(
-        manager.update("org-1", "org-other", { name: "Hacked" }),
-      ).rejects.toThrow(ForbiddenError);
+    it("delegates to repo regardless of callerOrgId (controller handles auth)", async () => {
+      const updated = fakeOrganization({ orgId: "org-1", name: "Updated" });
+      orgRepo.update.mockResolvedValue(updated);
 
-      expect(orgRepo.update).not.toHaveBeenCalled();
+      const result = await manager.update("org-1", "org-other", { name: "Updated" });
+
+      expect(orgRepo.update).toHaveBeenCalled();
+      expect(result.name).toBe("Updated");
     });
   });
 

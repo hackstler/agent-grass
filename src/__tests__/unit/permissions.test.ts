@@ -150,30 +150,32 @@ describe("Permission System", () => {
   // ── getPermissionSet ───────────────────────────────────────────────────────
 
   describe("getPermissionSet", () => {
-    it("user has exactly 4 permissions", () => {
+    it("user has exactly 5 permissions", () => {
       const set = getPermissionSet("user");
-      expect(set.size).toBe(4);
+      expect(set.size).toBe(5);
       expect(set.has("edit_own_profile")).toBe(true);
       expect(set.has("view_own_org")).toBe(true);
+      expect(set.has("view_quotes")).toBe(true);
       expect(set.has("use_chat")).toBe(true);
       expect(set.has("use_whatsapp_personal")).toBe(true);
     });
 
-    it("admin has 12 permissions (no whatsapp mgmt, no org CRUD, no view_all_orgs)", () => {
+    it("admin has 13 permissions (no whatsapp mgmt, no org CRUD, no view_all_orgs)", () => {
       const set = getPermissionSet("admin");
-      expect(set.size).toBe(12);
+      expect(set.size).toBe(13);
       expect(set.has("view_org_users")).toBe(true);
       expect(set.has("manage_knowledge")).toBe(true);
       expect(set.has("manage_catalogs")).toBe(true);
+      expect(set.has("view_quotes")).toBe(true);
       expect(set.has("view_whatsapp_mgmt")).toBe(false);
       expect(set.has("create_org")).toBe(false);
       expect(set.has("delete_org")).toBe(false);
       expect(set.has("view_all_orgs")).toBe(false);
     });
 
-    it("super_admin has all 17 permissions", () => {
+    it("super_admin has all 18 permissions", () => {
       const set = getPermissionSet("super_admin");
-      expect(set.size).toBe(17);
+      expect(set.size).toBe(18);
     });
 
     it("super_admin set is a superset of admin set", () => {

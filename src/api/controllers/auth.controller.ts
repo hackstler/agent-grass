@@ -78,6 +78,14 @@ export function createAuthController(
     if (parsed.data.orgId) dto.orgId = parsed.data.orgId;
     const { user, role } = await manager.register(dto, caller?.role);
 
+    // Ensure the organizations row exists (first user creates it automatically)
+    if (organizationRepo) {
+      const existing = await organizationRepo.findByOrgId(user.orgId);
+      if (!existing) {
+        await organizationRepo.create({ orgId: user.orgId, name: user.orgId, email: user.email });
+      }
+    }
+
     const token = issueToken(
       { userId: user.id, email: user.email!, orgId: user.orgId!, role },
       authConfig.jwtTtl,
@@ -186,8 +194,8 @@ export function createAuthController(
       email = bodyEmail;
     }
 
-    // If invitation has email hint, verify it matches
-    if (validation.email && validation.email !== email) {
+    // If invitation has email hint, verify it matches (case-insensitive)
+    if (validation.email && validation.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
       return c.json({ error: "Bad Request", message: "Email does not match invitation" }, 400);
     }
 

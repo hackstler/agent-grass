@@ -80,6 +80,8 @@ describe("WhatsAppManager", () => {
         userId: "u-1",
         orgId: "org-1",
         status: "pending",
+        linkingMethod: "qr",
+        phoneNumber: null,
       });
       expect(result).toEqual(created);
     });
@@ -95,6 +97,9 @@ describe("WhatsAppManager", () => {
         status: "pending",
         qrData: null,
         phone: null,
+        linkingMethod: "qr",
+        pairingCode: null,
+        phoneNumber: null,
       });
       expect(result.status).toBe("pending");
     });
@@ -125,6 +130,7 @@ describe("WhatsAppManager", () => {
         status: "disconnected",
         qrData: null,
         phone: null,
+        pairingCode: null,
       });
     });
 
