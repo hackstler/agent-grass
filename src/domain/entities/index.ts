@@ -6,6 +6,17 @@
  * to these interfaces without explicit mapping.
  */
 
+// ── Agent Context ───────────────────────────────────────────────────────────────
+
+export interface AgentContextParams {
+  userId: string;
+  orgId: string;
+  conversationId: string;
+  pdfRequestId?: string;
+}
+
+export type AgentContextKey = keyof AgentContextParams;
+
 // ── User ────────────────────────────────────────────────────────────────────────
 
 export interface User {

@@ -2,6 +2,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { ToolsInput } from "@mastra/core/agent";
 import type { Plugin } from "../plugins/plugin.interface.js";
+import { getAgentContextValue, buildAgentOptions } from "../application/agent-context.js";
 
 /**
  * Creates a single delegation tool that wraps a plugin's agent.
@@ -16,17 +17,17 @@ function createDelegationTool(plugin: Plugin) {
     }),
     execute: async ({ query }, context) => {
       try {
-        // Forward requestContext so sub-agent tools can read userId/orgId.
-        // Forward memory thread+resource so sub-agents with memory don't crash
-        // with "Thread ID is required" from Mastra's output processor.
-        const rc = context?.requestContext;
-        const threadId = rc?.get("conversationId") as string | undefined;
-        const resource = rc?.get("orgId") as string | undefined;
+        // Forward context so sub-agent tools can read userId/orgId and
+        // sub-agents with memory don't crash with "Thread ID is required".
+        const conversationId = getAgentContextValue(context, "conversationId");
+        const orgId = getAgentContextValue(context, "orgId");
+        const userId = getAgentContextValue(context, "userId");
 
-        const result = await plugin.agent.generate(query, {
-          ...(rc && { requestContext: rc }),
-          ...(threadId && { memory: { thread: threadId, resource: resource ?? "system" } }),
-        });
+        const opts = conversationId && orgId
+          ? buildAgentOptions({ userId: userId ?? "anonymous", orgId, conversationId })
+          : { ...(context?.requestContext && { requestContext: context.requestContext }) };
+
+        const result = await plugin.agent.generate(query, opts);
 
         if (!result.text?.trim()) {
           console.error(`[delegation] ${plugin.id} returned empty response`, {

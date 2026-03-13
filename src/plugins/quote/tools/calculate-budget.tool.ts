@@ -7,6 +7,7 @@ import type { OrganizationRepository } from "../../../domain/ports/repositories/
 import type { QuoteRepository } from "../../../domain/ports/repositories/quote.repository.js";
 import { quoteConfig } from "../config/quote.config.js";
 import { pdfStore } from "../services/pdf-store.js";
+import { getAgentContextValue } from "../../../application/agent-context.js";
 import type { GrassQuoteDataJson, GrassComparisonRowJson } from "../../../infrastructure/db/schema.js";
 
 export interface CalculateBudgetDeps {
@@ -75,7 +76,7 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
     }),
 
     execute: async ({ clientName, clientAddress, province, areaM2, surfaceType, perimeterLm, sacasAridos, applyVat }, context) => {
-      const orgId = context?.requestContext?.get("orgId") as string | undefined;
+      const orgId = getAgentContextValue(context, "orgId");
       if (!orgId) {
         return {
           success: false, clientName, areaM2: 0, surfaceType: "",
@@ -154,7 +155,7 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
       });
 
       // Store PDF for controller retrieval (WhatsApp delivery)
-      const pdfRequestId = context?.requestContext?.get("pdfRequestId") as string | undefined;
+      const pdfRequestId = getAgentContextValue(context, "pdfRequestId");
       if (pdfRequestId && pdfBase64) {
         pdfStore.set(pdfRequestId, { pdfBase64, filename });
       }
@@ -182,7 +183,7 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
       const total = String(cheapest.totalConIva);
 
       // Persist quote to DB
-      const userId = context?.requestContext?.get("userId") as string | undefined;
+      const userId = getAgentContextValue(context, "userId");
       if (userId && orgId) {
         try {
           await quoteRepo.create({

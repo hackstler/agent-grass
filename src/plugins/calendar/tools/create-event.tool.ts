@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { CalendarApiService } from "../services/calendar-api.service.js";
+import { getAgentContextValue } from "../../../application/agent-context.js";
 
 export interface CreateEventDeps {
   calendarService: CalendarApiService;
@@ -29,7 +30,7 @@ export function createCreateEventTool({ calendarService }: CreateEventDeps) {
     }),
 
     execute: async ({ summary, start, end, description, location, attendees, timeZone }, context) => {
-      const userId = context?.requestContext?.get('userId') as string;
+      const userId = getAgentContextValue(context, "userId");
       if (!userId) throw new Error('Missing userId in request context');
       return calendarService.createEvent(userId, {
         summary,

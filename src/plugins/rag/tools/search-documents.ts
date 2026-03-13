@@ -2,6 +2,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { ragConfig } from "../config/rag.config.js";
 import { runRetrievalPipeline } from "../pipeline/retrieval-pipeline.js";
+import { getAgentContextValue } from "../../../application/agent-context.js";
 import type { ToolEntry, ToolRegistryDeps } from "./base.js";
 
 const chunkSchema = z.object({
@@ -38,7 +39,7 @@ Returns the most relevant text passages ranked by relevance score.`,
       chunkCount: z.number(),
     }),
     execute: async ({ query, topK = ragConfig.topK, documentIds, topicId }, context) => {
-      const orgId = context?.requestContext?.get('orgId') as string;
+      const orgId = getAgentContextValue(context, "orgId");
       if (!orgId) throw new Error('Missing orgId in request context');
       const { chunks, chunkCount } = await runRetrievalPipeline(
         query,

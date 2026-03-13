@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { GmailApiService } from "../services/gmail-api.service.js";
+import { getAgentContextValue } from "../../../application/agent-context.js";
 
 export interface ReadEmailDeps {
   gmailService: GmailApiService;
@@ -27,7 +28,7 @@ export function createReadEmailTool({ gmailService }: ReadEmailDeps) {
       labelIds: z.array(z.string()),
     }),
     execute: async ({ messageId }, context) => {
-      const userId = context?.requestContext?.get('userId') as string;
+      const userId = getAgentContextValue(context, "userId");
       if (!userId) throw new Error('Missing userId in request context');
       return gmailService.readEmail(userId, messageId);
     },

@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { CalendarApiService } from "../services/calendar-api.service.js";
+import { getAgentContextValue } from "../../../application/agent-context.js";
 
 export interface DeleteEventDeps {
   calendarService: CalendarApiService;
@@ -22,7 +23,7 @@ export function createDeleteEventTool({ calendarService }: DeleteEventDeps) {
     }),
 
     execute: async ({ eventId }, context) => {
-      const userId = context?.requestContext?.get('userId') as string;
+      const userId = getAgentContextValue(context, "userId");
       if (!userId) throw new Error('Missing userId in request context');
       const result = await calendarService.deleteEvent(userId, eventId);
       return result;

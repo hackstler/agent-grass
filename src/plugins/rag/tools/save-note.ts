@@ -2,6 +2,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { ToolEntry } from "./base.js";
 import type { LoadedDocument } from "../ingestion/loader.js";
+import { getAgentContextValue } from "../../../application/agent-context.js";
 
 /**
  * Ingest one or multiple URLs / notes into the knowledge base.
@@ -43,7 +44,7 @@ For a list of URLs, pass ALL of them in the 'items' array in a single call — d
       })),
     }),
     execute: async ({ items }, context) => {
-      const orgId = context?.requestContext?.get('orgId') as string;
+      const orgId = getAgentContextValue(context, "orgId");
       if (!orgId) throw new Error('Missing orgId in request context');
       const { loadDocument } = await import("../ingestion/loader.js");
       const { processDocument } = await import("../ingestion/processor.js");
