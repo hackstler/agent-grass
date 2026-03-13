@@ -5,10 +5,10 @@ import type { PdfService, CompanyDetails } from "../services/pdf.service.js";
 import type { AttachmentStore } from "../../../domain/ports/attachment-store.js";
 import type { OrganizationRepository } from "../../../domain/ports/repositories/organization.repository.js";
 import type { QuoteRepository } from "../../../domain/ports/repositories/quote.repository.js";
+import type { QuoteStrategyRegistry } from "../strategies/index.js";
 import { quoteConfig } from "../config/quote.config.js";
 import { pdfStore } from "../services/pdf-store.js";
 import { getAgentContextValue } from "../../../application/agent-context.js";
-import type { GrassQuoteDataJson, GrassComparisonRowJson } from "../../../infrastructure/db/schema.js";
 
 export interface CalculateBudgetDeps {
   catalogService: CatalogService;
@@ -16,6 +16,7 @@ export interface CalculateBudgetDeps {
   attachmentStore: AttachmentStore;
   organizationRepo: OrganizationRepository;
   quoteRepo: QuoteRepository;
+  strategyRegistry: QuoteStrategyRegistry;
 }
 
 /** Build CompanyDetails from org record, falling back to quoteConfig defaults. */
@@ -35,30 +36,15 @@ function resolveCompanyDetails(
   };
 }
 
-export function createCalculateBudgetTool({ catalogService, pdfService, attachmentStore, organizationRepo, quoteRepo }: CalculateBudgetDeps) {
+export function createCalculateBudgetTool({ catalogService, pdfService, attachmentStore, organizationRepo, quoteRepo, strategyRegistry }: CalculateBudgetDeps) {
+  // Use default strategy for schema and description (at tool creation time)
+  const strategy = strategyRegistry.getDefault();
+
   return createTool({
     id: "calculateBudget",
-    description: `Calculate a comparison quote for artificial grass installation and generate a PDF.
-The quote compares ALL 8 grass types side by side for the given surface area and type.
-Required: client name, address, area in m², surface type (SOLADO or TIERRA), perimeter in linear meters.
-Returns a table with pricing for each grass type and generates a comparison PDF.`,
+    description: strategy.getToolDescription(),
 
-    inputSchema: z.object({
-      clientName: z.string().min(3).refine(
-        (v) => !["cliente", "desconocido", "unknown", "n/a"].includes(v.toLowerCase().trim()),
-        { message: "Client name must be a real name, not a placeholder. Ask the seller for the actual client name." },
-      ).describe("Full name of the client (real name, not generic)"),
-      clientAddress: z.string().min(10).refine(
-        (v) => !["desconocida", "unknown", "n/a", "sin dirección", "sin direccion"].includes(v.toLowerCase().trim()),
-        { message: "Client address must be a real address, not a placeholder. Ask the seller for the actual address." },
-      ).describe("Full address of the client (real address, at least street and number)"),
-      province: z.string().optional().describe("Province (e.g. Madrid, Toledo)"),
-      areaM2: z.number().positive().describe("Surface area in square meters"),
-      surfaceType: z.enum(["SOLADO", "TIERRA"]).describe("SOLADO = concrete/tiles, TIERRA = natural ground"),
-      perimeterLm: z.number().nonnegative().default(0).describe("Perimeter in linear meters (for wooden borders). 0 if none needed"),
-      sacasAridos: z.number().nonnegative().default(0).describe("Number of zahorra bags for ground preparation. Only for TIERRA. 0 if none needed"),
-      applyVat: z.boolean().default(true).describe("Whether to include 21% VAT"),
-    }),
+    inputSchema: strategy.getInputSchema(),
 
     outputSchema: z.object({
       success: z.boolean(),
@@ -86,12 +72,12 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
       }
 
       // Fetch org data and catalog in parallel
-      const [org, catalogId] = await Promise.all([
+      const [org, activeCatalog] = await Promise.all([
         organizationRepo.findByOrgId(orgId),
-        catalogService.getActiveCatalogId(orgId),
+        catalogService.getActiveCatalog(orgId),
       ]);
 
-      if (!catalogId) {
+      if (!activeCatalog) {
         return {
           success: false, clientName, areaM2, surfaceType,
           rows: [], pdfGenerated: false, filename: "",
@@ -99,39 +85,31 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
         };
       }
 
+      // Resolve strategy from catalog's businessType
+      const activeStrategy = strategyRegistry.resolve(activeCatalog.businessType);
       const company = resolveCompanyDetails(org);
 
-      // Get price/m² for all 8 grass types
-      const grassPrices = await catalogService.getAllGrassPrices(catalogId, surfaceType, areaM2);
-      if (grassPrices.length === 0) {
+      // Pack all input fields for the strategy
+      const strategyInput: Record<string, unknown> = {
+        clientName, clientAddress, province, areaM2, surfaceType, perimeterLm, sacasAridos, applyVat,
+      };
+
+      // Delegate calculation to the strategy
+      let result;
+      try {
+        result = await activeStrategy.calculate({
+          input: strategyInput,
+          company,
+          catalogId: activeCatalog.id,
+          catalogService,
+        });
+      } catch (err) {
         return {
           success: false, clientName, areaM2, surfaceType,
           rows: [], pdfGenerated: false, filename: "",
-          error: "No grass pricing data found. Please seed the catalog first.",
+          error: err instanceof Error ? err.message : String(err),
         };
       }
-
-      // Calculate traviesas and áridos costs
-      const traviesasCost = Math.round(perimeterLm * quoteConfig.traviesasPricePerLm * 100) / 100;
-      const aridosCost = Math.round(sacasAridos * quoteConfig.aridosPricePerSaca * 100) / 100;
-
-      // Build comparison rows
-      const comparisonRows: GrassComparisonRowJson[] = grassPrices.map((gp) => {
-        const totalGrassInstalled = Math.round(gp.pricePerM2 * areaM2 * 100) / 100;
-        const baseImponible = Math.round((totalGrassInstalled + aridosCost + traviesasCost) * 100) / 100;
-        const iva = applyVat ? Math.round(baseImponible * company.vatRate * 100) / 100 : 0;
-        const totalConIva = Math.round((baseImponible + iva) * 100) / 100;
-        return {
-          grassName: gp.grassName,
-          pricePerM2: gp.pricePerM2,
-          totalGrassInstalled,
-          aridosTotal: aridosCost,
-          traviesasTotal: traviesasCost,
-          baseImponible,
-          iva,
-          totalConIva,
-        };
-      });
 
       // Generate quote number and filename
       const now = new Date();
@@ -139,19 +117,16 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
       const dateStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
       const filename = `${quoteNumber}.pdf`;
 
-      // Generate comparison PDF
-      const pdfBase64 = await pdfService.generateComparisonPdf({
+      // Delegate PDF generation to the strategy
+      const pdfBase64 = await activeStrategy.generatePdf({
         quoteNumber,
         date: dateStr,
         company,
         clientName,
         clientAddress,
         province: province ?? "",
-        areaM2,
-        surfaceType,
-        perimeterLm,
-        sacasAridos,
-        rows: comparisonRows,
+        result,
+        pdfService,
       });
 
       // Store PDF for controller retrieval (WhatsApp delivery)
@@ -165,23 +140,6 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
         attachmentStore.store(filename, { base64: pdfBase64, mimetype: "application/pdf", filename });
       }
 
-      // Build JSONB data for DB persistence
-      const quoteData: GrassQuoteDataJson = {
-        areaM2,
-        surfaceType,
-        perimeterLm,
-        sacasAridos,
-        rows: comparisonRows,
-        traviesasNote: `Traviesa madera tratada: ${perimeterLm} ml × ${quoteConfig.traviesasPricePerLm} €/ml`,
-        ...(sacasAridos > 0 && { aridosNote: `Zahorra: ${sacasAridos} sacas × ${quoteConfig.aridosPricePerSaca} €/saca` }),
-      };
-
-      // Use the cheapest row's total as the "representative" quote total for backward compat
-      const cheapest = comparisonRows[0]!;
-      const subtotal = String(cheapest.baseImponible);
-      const vatAmount = String(cheapest.iva);
-      const total = String(cheapest.totalConIva);
-
       // Persist quote to DB
       const userId = getAgentContextValue(context, "userId");
       if (userId && orgId) {
@@ -193,31 +151,29 @@ Returns a table with pricing for each grass type and generates a comparison PDF.
             clientName,
             clientAddress,
             lineItems: [], // comparison quotes don't use line items
-            subtotal,
-            vatAmount,
-            total,
+            subtotal: String(result.representativeTotals.subtotal),
+            vatAmount: String(result.representativeTotals.vat),
+            total: String(result.representativeTotals.total),
             pdfBase64: pdfBase64 ?? null,
             filename,
-            quoteData,
-            surfaceType,
-            areaM2: String(areaM2),
-            perimeterLm: String(perimeterLm),
-            province: province ?? null,
+            quoteData: result.quoteData as Record<string, unknown>,
+            ...result.extraColumns,
           });
         } catch (err) {
           console.error("[quote] failed to persist quote:", err instanceof Error ? err.message : err);
         }
       }
 
+      // Build response (same shape as before for backward compat)
       return {
         success: true,
         clientName,
         areaM2,
         surfaceType,
-        rows: comparisonRows.map((r) => ({
-          grassName: r.grassName,
-          pricePerM2: r.pricePerM2,
-          totalConIva: r.totalConIva,
+        rows: result.rows.map((r) => ({
+          grassName: r.itemName,
+          pricePerM2: r.breakdown["pricePerM2"] ?? 0,
+          totalConIva: r.total,
         })),
         pdfGenerated: !!pdfBase64,
         filename,

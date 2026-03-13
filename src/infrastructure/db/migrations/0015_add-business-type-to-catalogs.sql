@@ -1,0 +1,1 @@
+ALTER TABLE "catalogs" ADD COLUMN "business_type" text DEFAULT 'grass' NOT NULL;

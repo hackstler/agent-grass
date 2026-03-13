@@ -1,17 +1,18 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { CatalogService } from "../services/catalog.service.js";
+import type { QuoteStrategy } from "../strategies/index.js";
 import { getAgentContextValue } from "../../../application/agent-context.js";
 
 export interface ListCatalogDeps {
   catalogService: CatalogService;
+  strategy: QuoteStrategy;
 }
 
-export function createListCatalogTool({ catalogService }: ListCatalogDeps) {
+export function createListCatalogTool({ catalogService, strategy }: ListCatalogDeps) {
   return createTool({
     id: "listCatalog",
-    description: `List the available grass types in the organization's catalog.
-Returns grass type names and descriptions. Pricing varies by surface type and m² — use calculateBudget for actual prices.`,
+    description: strategy.getListCatalogDescription(),
 
     inputSchema: z.object({}),
 
@@ -62,7 +63,7 @@ Returns grass type names and descriptions. Pricing varies by surface type and m�
           description: i.description,
           unit: i.unit,
         })),
-        note: "El pricing varía según tipo de superficie (SOLADO/TIERRA) y m². Usa calculateBudget para precios exactos.",
+        note: strategy.getListCatalogNote(),
       };
     },
   });
