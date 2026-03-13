@@ -22,9 +22,10 @@ function createDelegationTool(plugin: Plugin) {
         const conversationId = getAgentContextValue(context, "conversationId");
         const orgId = getAgentContextValue(context, "orgId");
         const userId = getAgentContextValue(context, "userId");
+        const pdfRequestId = getAgentContextValue(context, "pdfRequestId");
 
         const opts = conversationId && orgId
-          ? buildAgentOptions({ userId: userId ?? "anonymous", orgId, conversationId })
+          ? buildAgentOptions({ userId: userId ?? "anonymous", orgId, conversationId, ...(pdfRequestId && { pdfRequestId }) })
           : { ...(context?.requestContext && { requestContext: context.requestContext }) };
 
         const result = await plugin.agent.generate(query, opts);
