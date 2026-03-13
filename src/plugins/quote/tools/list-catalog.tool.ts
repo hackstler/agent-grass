@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { CatalogService } from "../services/catalog.service.js";
+import { getAgentContextValue } from "../../../application/agent-context.js";
 
 export interface ListCatalogDeps {
   catalogService: CatalogService;
@@ -28,7 +29,7 @@ Returns grass type names and descriptions. Pricing varies by surface type and mÂ
     }),
 
     execute: async (_input, context) => {
-      const orgId = context?.requestContext?.get("orgId") as string | undefined;
+      const orgId = getAgentContextValue(context, "orgId");
       if (!orgId) {
         return {
           success: false,

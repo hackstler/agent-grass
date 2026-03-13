@@ -2,9 +2,9 @@ import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { z } from "zod";
 import type { Agent } from "@mastra/core/agent";
-import { RequestContext } from "@mastra/core/request-context";
 import { ragConfig } from "../config/rag.config.js";
 import { extractSources } from "../../../api/helpers/extract-sources.js";
+import { buildAgentOptions } from "../../../application/agent-context.js";
 import type { ConversationManager } from "../../../application/managers/conversation.manager.js";
 
 const chatSchema = z.object({
@@ -35,14 +35,11 @@ export function createChatRoutes(agent: Agent, convManager: ConversationManager)
     const orgId = c.get("user")?.orgId;
     if (!orgId) return c.json({ error: "Unauthorized", message: "Missing orgId" }, 401);
     const userId = c.get("user")?.userId;
-    const conversationId = await resolveConversationId(parsed.data.conversationId, convManager, userId);
+    const conversationId = await resolveConversationId(parsed.data.conversationId, convManager, userId, query);
 
-    const requestContext = new RequestContext([['userId', userId ?? 'anonymous'], ['orgId', orgId]]);
+    const agentOptions = buildAgentOptions({ userId: userId ?? "anonymous", orgId, conversationId });
 
-    const result = await agent.generate(query, {
-      requestContext,
-      memory: { thread: conversationId, resource: orgId },
-    });
+    const result = await agent.generate(query, agentOptions);
 
     const sources = extractSources(result.steps ?? []);
 
@@ -87,7 +84,7 @@ export function createChatRoutes(agent: Agent, convManager: ConversationManager)
       return c.json({ error: parsed.error.message }, 400);
     }
 
-    const conversationId = await resolveConversationId(parsed.data.conversationId, convManager, userId);
+    const conversationId = await resolveConversationId(parsed.data.conversationId, convManager, userId, parsed.data.query);
 
     c.header("Content-Type", "text/event-stream");
     c.header("Cache-Control", "no-cache");
@@ -100,17 +97,21 @@ export function createChatRoutes(agent: Agent, convManager: ConversationManager)
       const collectedSources: Array<{ id: string; documentTitle: string; documentSource: string; score: number; excerpt: string }> = [];
 
       try {
-        const requestContext = new RequestContext([['userId', userId ?? 'anonymous'], ['orgId', orgId]]);
+        const agentOptions = buildAgentOptions({ userId: userId ?? "anonymous", orgId, conversationId });
 
-        const agentStream = await agent.stream(parsed.data.query, {
-          requestContext,
-          memory: { thread: conversationId, resource: orgId },
-        });
+        const agentStream = await agent.stream(parsed.data.query, agentOptions);
 
         for await (const chunk of agentStream.fullStream) {
           const payload = (chunk as { payload?: Record<string, unknown> }).payload ?? {};
 
-          if (chunk.type === "tool-result") {
+          if (chunk.type === "tool-call") {
+            const toolName = payload["toolName"] as string | undefined;
+            if (toolName) {
+              await streamWriter.write(
+                `data: ${JSON.stringify({ type: "tool-call", toolName })}\n\n`
+              );
+            }
+          } else if (chunk.type === "tool-result") {
             const toolName = payload["toolName"] as string | undefined;
             if (toolName === "searchDocuments" && !sourcesEmitted) {
               const res = payload["result"] as {
@@ -172,6 +173,7 @@ async function resolveConversationId(
   id: string | undefined,
   convManager: ConversationManager,
   userId?: string,
+  query?: string,
 ): Promise<string> {
   if (id) {
     try {
@@ -182,6 +184,10 @@ async function resolveConversationId(
     }
   }
 
-  const conv = await convManager.create({ userId, title: "New conversation" });
+  const title = query && query.length > 60
+    ? query.slice(0, 60) + "..."
+    : query || "New conversation";
+
+  const conv = await convManager.create({ userId, title });
   return conv.id;
 }

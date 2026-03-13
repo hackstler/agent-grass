@@ -2,9 +2,9 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import type { Agent } from "@mastra/core/agent";
-import { RequestContext } from "@mastra/core/request-context";
 import type { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
 import type { ConversationManager } from "../../application/managers/conversation.manager.js";
+import { buildAgentOptions } from "../../application/agent-context.js";
 import { extractSources } from "../helpers/extract-sources.js";
 import { formatForWhatsApp, buildSourcesFooter } from "../helpers/format-whatsapp.js";
 import { ragConfig } from "../../plugins/rag/config/rag.config.js";
@@ -131,12 +131,9 @@ export function createInternalController(
       );
 
       const pdfRequestId = randomUUID();
-      const requestContext = new RequestContext([['userId', userId], ['orgId', orgId], ['conversationId', conversationId], ['pdfRequestId', pdfRequestId]]);
+      const agentOptions = buildAgentOptions({ userId, orgId, conversationId, pdfRequestId });
 
-      const result = await agent.generate(messageBody, {
-        requestContext,
-        memory: { thread: conversationId, resource: orgId },
-      });
+      const result = await agent.generate(messageBody, agentOptions);
 
       const replyText = result.text?.trim();
       if (!replyText) {

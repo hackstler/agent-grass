@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { GmailApiService } from "../services/gmail-api.service.js";
+import { getAgentContextValue } from "../../../application/agent-context.js";
 
 export interface SearchEmailsDeps {
   gmailService: GmailApiService;
@@ -36,7 +37,7 @@ export function createSearchEmailsTool({ gmailService }: SearchEmailsDeps) {
       totalResults: z.number(),
     }),
     execute: async ({ query, maxResults }, context) => {
-      const userId = context?.requestContext?.get('userId') as string;
+      const userId = getAgentContextValue(context, "userId");
       if (!userId) throw new Error('Missing userId in request context');
       const result = await gmailService.searchEmails(userId, query, maxResults ?? 10);
       return {

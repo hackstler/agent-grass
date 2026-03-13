@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { GmailApiService } from "../services/gmail-api.service.js";
+import { getAgentContextValue } from "../../../application/agent-context.js";
 
 export interface ListEmailsDeps {
   gmailService: GmailApiService;
@@ -32,7 +33,7 @@ export function createListEmailsTool({ gmailService }: ListEmailsDeps) {
       totalResults: z.number(),
     }),
     execute: async ({ maxResults }, context) => {
-      const userId = context?.requestContext?.get('userId') as string;
+      const userId = getAgentContextValue(context, "userId");
       if (!userId) throw new Error('Missing userId in request context');
       const result = await gmailService.listEmails(userId, maxResults ?? 10);
       return {

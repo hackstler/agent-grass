@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { CatalogManager } from "../../../application/managers/catalog.manager.js";
+import { getAgentContextValue } from "../../../application/agent-context.js";
 
 export function createUpdateItemTool(catalogManager: CatalogManager) {
   return createTool({
@@ -31,7 +32,7 @@ export function createUpdateItemTool(catalogManager: CatalogManager) {
     }),
 
     execute: async ({ catalogId, itemId, name, pricePerUnit, unit, description, category }, context) => {
-      const orgId = context?.requestContext?.get("orgId") as string | undefined;
+      const orgId = getAgentContextValue(context, "orgId");
       if (!orgId) return { success: false, error: "Missing orgId in request context" };
 
       try {

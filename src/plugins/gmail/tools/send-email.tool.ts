@@ -2,6 +2,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { GmailApiService } from "../services/gmail-api.service.js";
 import type { AttachmentStore } from "../../../domain/ports/attachment-store.js";
+import { getAgentContextValue } from "../../../application/agent-context.js";
 
 export interface SendEmailDeps {
   gmailService: GmailApiService;
@@ -42,7 +43,7 @@ exactly as shown when it was generated (e.g., "PRES-20260306-1234.pdf").`,
       attachmentIncluded: z.boolean(),
     }),
     execute: async ({ to, subject, body, attachmentFilename }, context) => {
-      const userId = context?.requestContext?.get('userId') as string;
+      const userId = getAgentContextValue(context, "userId");
       if (!userId) throw new Error('Missing userId in request context');
 
       let attachment: { base64: string; mimetype: string; filename: string } | undefined;
