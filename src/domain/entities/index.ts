@@ -8,14 +8,25 @@
 
 // ── Agent Context ───────────────────────────────────────────────────────────────
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface AgentContextParams {
   userId: string;
   orgId: string;
   conversationId: string;
   pdfRequestId?: string;
+  /** Mastra hook: fires after the entire agent execution completes. */
+  onFinish?: (event: any) => void | Promise<void>;
+  /** Mastra hook: fires after each LLM step completes. */
+  onStepFinish?: (event: any) => void | Promise<void>;
+  /** Mastra delegation hooks for sub-agent orchestration. */
+  delegation?: {
+    onDelegationStart?: (context: any) => void | Promise<void>;
+    onDelegationComplete?: (context: any) => void | Promise<void>;
+  };
 }
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
-export type AgentContextKey = keyof AgentContextParams;
+export type AgentContextKey = "userId" | "orgId" | "conversationId" | "pdfRequestId";
 
 // ── User ────────────────────────────────────────────────────────────────────────
 
@@ -176,6 +187,13 @@ export interface OrgFeatures {
   quotes?: boolean;
 }
 
+/** Per-organization quote settings — transversal to all quote types. */
+export interface QuoteSettings {
+  paymentTerms?: string | undefined;
+  quoteValidityDays?: number | undefined;
+  companyRegistration?: string | undefined;
+}
+
 export interface Organization {
   id: string;
   orgId: string;
@@ -190,6 +208,7 @@ export interface Organization {
   vatRate: string | null;
   currency: string;
   features: OrgFeatures | null;
+  quoteSettings: QuoteSettings | null;
   metadata: Record<string, unknown> | null;
   createdAt: Date;
   updatedAt: Date;
@@ -209,6 +228,7 @@ export interface NewOrganization {
   vatRate?: string | null | undefined;
   currency?: string | undefined;
   features?: OrgFeatures | null | undefined;
+  quoteSettings?: QuoteSettings | null | undefined;
   metadata?: Record<string, unknown> | null | undefined;
   createdAt?: Date | undefined;
   updatedAt?: Date | undefined;

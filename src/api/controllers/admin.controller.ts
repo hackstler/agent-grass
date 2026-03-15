@@ -43,6 +43,12 @@ const createOrgValidator = z.object({
   currency: z.string().max(10).optional(),
 });
 
+const quoteSettingsValidator = z.object({
+  paymentTerms: z.string().max(1000).optional(),
+  quoteValidityDays: z.number().int().min(1).max(365).optional(),
+  companyRegistration: z.string().max(1000).optional(),
+}).optional().nullable();
+
 const updateOrgValidator = z.object({
   slug: z.string().regex(/^[a-z0-9-]+$/).min(2).max(50).optional().nullable(),
   name: z.string().max(200).optional().nullable(),
@@ -53,6 +59,7 @@ const updateOrgValidator = z.object({
   logo: z.string().max(2_000_000).optional().nullable(),
   vatRate: z.number().min(0).max(1).optional().nullable(),
   currency: z.string().max(10).optional(),
+  quoteSettings: quoteSettingsValidator,
   metadata: z.record(z.unknown()).optional().nullable(),
 });
 

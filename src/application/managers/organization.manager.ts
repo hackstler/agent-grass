@@ -43,6 +43,7 @@ export interface UpdateOrgDto {
   vatRate?: string | null | undefined;
   currency?: string | undefined;
   features?: import("../../domain/entities/index.js").OrgFeatures | null | undefined;
+  quoteSettings?: import("../../domain/entities/index.js").QuoteSettings | null | undefined;
   metadata?: Record<string, unknown> | null | undefined;
 }
 

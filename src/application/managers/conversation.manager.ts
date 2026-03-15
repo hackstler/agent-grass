@@ -44,6 +44,10 @@ export class ConversationManager {
     return conv.id;
   }
 
+  async updateTitle(id: string, title: string): Promise<void> {
+    await this.repo.updateTitle(id, title);
+  }
+
   /** Persist user + assistant messages and update conversation timestamp. */
   async persistMessages(
     conversationId: string,

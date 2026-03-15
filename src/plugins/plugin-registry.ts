@@ -1,7 +1,6 @@
 import type { Hono } from "hono";
-import type { ToolsInput } from "@mastra/core/agent";
+import type { Agent, ToolsInput } from "@mastra/core/agent";
 import type { Plugin } from "./plugin.interface.js";
-import { createDelegationTools } from "../agent/delegation.js";
 
 export class PluginRegistry {
   private plugins = new Map<string, Plugin>();
@@ -34,8 +33,13 @@ export class PluginRegistry {
     return tools;
   }
 
-  getDelegationTools(): ToolsInput {
-    return createDelegationTools(this.getAll());
+  /** Returns a map of plugin agents keyed by plugin id — used by the Supervisor Pattern. */
+  getAgentMap(): Record<string, Agent> {
+    const agents: Record<string, Agent> = {};
+    for (const plugin of this.plugins.values()) {
+      agents[plugin.id] = plugin.agent;
+    }
+    return agents;
   }
 
   mountRoutes(app: Hono): void {

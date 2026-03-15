@@ -99,8 +99,9 @@ Returns grass type names and descriptions. Pricing varies by surface type and m�
     company: CompanyDetails;
     catalogId: string;
     catalogService: CatalogService;
+    catalogSettings?: Record<string, unknown> | null | undefined;
   }): Promise<QuoteCalculationResult> {
-    const { input, company, catalogId, catalogService } = params;
+    const { input, company, catalogId, catalogService, catalogSettings } = params;
 
     const areaM2 = input["areaM2"] as number;
     const surfaceType = input["surfaceType"] as "SOLADO" | "TIERRA";
@@ -114,9 +115,13 @@ Returns grass type names and descriptions. Pricing varies by surface type and m�
       throw new Error("No grass pricing data found. Please seed the catalog first.");
     }
 
-    // Calculate traviesas and áridos costs (identical formulas)
-    const traviesasCost = Math.round(perimeterLm * quoteConfig.traviesasPricePerLm * 100) / 100;
-    const aridosCost = Math.round(sacasAridos * quoteConfig.aridosPricePerSaca * 100) / 100;
+    // Calculate traviesas and áridos costs — use catalog settings if available
+    const traviesasPrice = (typeof catalogSettings?.["traviesasPricePerLm"] === "number")
+      ? catalogSettings["traviesasPricePerLm"] : quoteConfig.traviesasPricePerLm;
+    const aridosPrice = (typeof catalogSettings?.["aridosPricePerSaca"] === "number")
+      ? catalogSettings["aridosPricePerSaca"] : quoteConfig.aridosPricePerSaca;
+    const traviesasCost = Math.round(perimeterLm * traviesasPrice * 100) / 100;
+    const aridosCost = Math.round(sacasAridos * aridosPrice * 100) / 100;
 
     // Build comparison rows (identical to current logic)
     const comparisonRows: GrassComparisonRowJson[] = grassPrices.map((gp) => {
@@ -154,10 +159,10 @@ Returns grass type names and descriptions. Pricing varies by surface type and m�
     // Notes
     const notes: string[] = [];
     if (perimeterLm > 0) {
-      notes.push(`Traviesa madera tratada: ${perimeterLm} ml × ${quoteConfig.traviesasPricePerLm} €/ml`);
+      notes.push(`Traviesa madera tratada: ${perimeterLm} ml × ${traviesasPrice} €/ml`);
     }
     if (sacasAridos > 0) {
-      notes.push(`Zahorra: ${sacasAridos} sacas × ${quoteConfig.aridosPricePerSaca} €/saca`);
+      notes.push(`Zahorra: ${sacasAridos} sacas × ${aridosPrice} €/saca`);
     }
 
     // Build JSONB data for DB persistence (identical structure)
@@ -167,8 +172,8 @@ Returns grass type names and descriptions. Pricing varies by surface type and m�
       perimeterLm,
       sacasAridos,
       rows: comparisonRows,
-      traviesasNote: `Traviesa madera tratada: ${perimeterLm} ml × ${quoteConfig.traviesasPricePerLm} €/ml`,
-      ...(sacasAridos > 0 && { aridosNote: `Zahorra: ${sacasAridos} sacas × ${quoteConfig.aridosPricePerSaca} €/saca` }),
+      traviesasNote: `Traviesa madera tratada: ${perimeterLm} ml × ${traviesasPrice} €/ml`,
+      ...(sacasAridos > 0 && { aridosNote: `Zahorra: ${sacasAridos} sacas × ${aridosPrice} €/saca` }),
     };
 
     // Representative totals (cheapest row, for backward compat)
@@ -204,8 +209,9 @@ Returns grass type names and descriptions. Pricing varies by surface type and m�
     province: string;
     result: QuoteCalculationResult;
     pdfService: PdfService;
+    footer?: import("../services/pdf.service.js").QuoteFooterSettings | undefined;
   }): Promise<string> {
-    const { quoteNumber, date, company, clientName, clientAddress, province, result, pdfService } = params;
+    const { quoteNumber, date, company, clientName, clientAddress, province, result, pdfService, footer } = params;
 
     // Reconstruct the exact ComparisonPdfData that generateComparisonPdf expects
     const quoteData = result.quoteData as unknown as GrassQuoteDataJson;
@@ -232,6 +238,7 @@ Returns grass type names and descriptions. Pricing varies by surface type and m�
       perimeterLm: quoteData.perimeterLm,
       sacasAridos: quoteData.sacasAridos,
       rows: comparisonRows,
+      footer,
     };
 
     // Delegate to the EXACT same method — zero PDF changes

@@ -23,11 +23,19 @@ export function createAgentContext(params: AgentContextParams): RequestContext {
 /**
  * Builds the full options object for `agent.generate()` / `agent.stream()`.
  * Encapsulates the coupling between RequestContext keys and Mastra memory params.
+ *
+ * Supports Mastra hooks (onFinish, onStepFinish, delegation) when provided
+ * in params — the route handler passes them in, buildAgentOptions passes them through.
  */
 export function buildAgentOptions(params: AgentContextParams) {
   return {
     requestContext: createAgentContext(params),
-    memory: { thread: params.conversationId, resource: params.orgId },
+    memory: { thread: params.conversationId, resource: params.userId },
+    maxSteps: 30,
+    // Mastra hooks — only included if provided by the caller
+    ...(params.onFinish && { onFinish: params.onFinish }),
+    ...(params.onStepFinish && { onStepFinish: params.onStepFinish }),
+    ...(params.delegation && { delegation: params.delegation }),
   };
 }
 

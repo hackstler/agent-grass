@@ -68,6 +68,12 @@ export interface OrgFeatures {
   quotes?: boolean;
 }
 
+export interface QuoteSettings {
+  paymentTerms?: string | undefined;
+  quoteValidityDays?: number | undefined;
+  companyRegistration?: string | undefined;
+}
+
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: text("org_id").notNull().unique(),
@@ -82,6 +88,7 @@ export const organizations = pgTable("organizations", {
   vatRate: numeric("vat_rate", { precision: 5, scale: 4 }),
   currency: text("currency").notNull().default("€"),
   features: jsonb("features").$type<OrgFeatures>().default({}),
+  quoteSettings: jsonb("quote_settings").$type<QuoteSettings>(),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -210,6 +217,7 @@ export const catalogs = pgTable("catalogs", {
   businessType: text("business_type").notNull().default("grass"),
   effectiveDate: timestamp("effective_date", { withTimezone: true }).notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  settings: jsonb("settings").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

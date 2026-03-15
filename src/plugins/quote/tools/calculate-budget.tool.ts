@@ -6,6 +6,7 @@ import type { AttachmentStore } from "../../../domain/ports/attachment-store.js"
 import type { OrganizationRepository } from "../../../domain/ports/repositories/organization.repository.js";
 import type { QuoteRepository } from "../../../domain/ports/repositories/quote.repository.js";
 import type { QuoteStrategyRegistry } from "../strategies/index.js";
+import type { QuoteFooterSettings } from "../services/pdf.service.js";
 import { quoteConfig } from "../config/quote.config.js";
 import { pdfStore } from "../services/pdf-store.js";
 import { getAgentContextValue } from "../../../application/agent-context.js";
@@ -17,6 +18,18 @@ export interface CalculateBudgetDeps {
   organizationRepo: OrganizationRepository;
   quoteRepo: QuoteRepository;
   strategyRegistry: QuoteStrategyRegistry;
+}
+
+/** Build QuoteFooterSettings from org.quoteSettings, falling back to quoteConfig defaults. */
+function resolveQuoteFooter(
+  org: { quoteSettings?: import("../../../domain/entities/index.js").QuoteSettings | null } | null,
+): QuoteFooterSettings {
+  const qs = org?.quoteSettings;
+  return {
+    paymentTerms: qs?.paymentTerms ?? quoteConfig.paymentTerms,
+    quoteValidityDays: qs?.quoteValidityDays ?? quoteConfig.quoteValidityDays,
+    companyRegistration: qs?.companyRegistration ?? quoteConfig.companyRegistration,
+  };
 }
 
 /** Build CompanyDetails from org record, falling back to quoteConfig defaults. */
@@ -88,6 +101,7 @@ export function createCalculateBudgetTool({ catalogService, pdfService, attachme
       // Resolve strategy from catalog's businessType
       const activeStrategy = strategyRegistry.resolve(activeCatalog.businessType);
       const company = resolveCompanyDetails(org);
+      const footer = resolveQuoteFooter(org);
 
       // Pack all input fields for the strategy
       const strategyInput: Record<string, unknown> = {
@@ -102,6 +116,7 @@ export function createCalculateBudgetTool({ catalogService, pdfService, attachme
           company,
           catalogId: activeCatalog.id,
           catalogService,
+          catalogSettings: activeCatalog.settings,
         });
       } catch (err) {
         return {
@@ -127,6 +142,7 @@ export function createCalculateBudgetTool({ catalogService, pdfService, attachme
         province: province ?? "",
         result,
         pdfService,
+        footer,
       });
 
       // Store PDF for controller retrieval (WhatsApp delivery)

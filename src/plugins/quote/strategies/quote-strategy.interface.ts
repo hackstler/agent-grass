@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { CompanyDetails } from "../services/pdf.service.js";
+import type { CompanyDetails, QuoteFooterSettings } from "../services/pdf.service.js";
 import type { CatalogService } from "../services/catalog.service.js";
 import type { PdfService } from "../services/pdf.service.js";
 
@@ -73,6 +73,7 @@ export interface QuoteStrategy {
     company: CompanyDetails;
     catalogId: string;
     catalogService: CatalogService;
+    catalogSettings?: Record<string, unknown> | null | undefined;
   }): Promise<QuoteCalculationResult>;
 
   /**
@@ -88,5 +89,6 @@ export interface QuoteStrategy {
     province: string;
     result: QuoteCalculationResult;
     pdfService: PdfService;
+    footer?: QuoteFooterSettings | undefined;
   }): Promise<string>;
 }

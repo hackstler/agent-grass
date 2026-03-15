@@ -53,6 +53,7 @@ export function createMockConversationRepo(): {
     findByTitle: vi.fn(),
     create: vi.fn(),
     delete: vi.fn(),
+    updateTitle: vi.fn().mockResolvedValue(undefined),
     persistMessages: vi.fn().mockResolvedValue(undefined),
   };
 }

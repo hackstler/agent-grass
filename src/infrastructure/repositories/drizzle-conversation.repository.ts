@@ -83,6 +83,13 @@ export class DrizzleConversationRepository implements ConversationRepository {
     return result.length > 0;
   }
 
+  async updateTitle(id: string, title: string): Promise<void> {
+    await db
+      .update(conversations)
+      .set({ title, updatedAt: new Date() })
+      .where(eq(conversations.id, id));
+  }
+
   async persistMessages(data: PersistMessagesData): Promise<void> {
     await db.insert(messages).values([
       { conversationId: data.conversationId, role: "user" as const, content: data.userMessage },

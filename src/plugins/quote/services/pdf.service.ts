@@ -31,6 +31,7 @@ export interface QuoteData {
   subtotal: number;
   vatAmount: number;
   total: number;
+  footer?: QuoteFooterSettings | undefined;
 }
 
 export interface ComparisonRow {
@@ -42,6 +43,12 @@ export interface ComparisonRow {
   baseImponible: number;
   iva: number;
   totalConIva: number;
+}
+
+export interface QuoteFooterSettings {
+  paymentTerms: string;
+  quoteValidityDays: number;
+  companyRegistration: string;
 }
 
 export interface ComparisonPdfData {
@@ -56,6 +63,7 @@ export interface ComparisonPdfData {
   perimeterLm: number;
   sacasAridos: number;
   rows: ComparisonRow[];
+  footer?: QuoteFooterSettings | undefined;
 }
 
 const C = {
@@ -226,8 +234,26 @@ export class PdfService {
     page.drawText(totalStr, { x: valueX - totalValueW, y, font: bold, size: 11, color: C.white });
 
     // ── Footer ────────────────────────────────────────────────────────────────
-    page.drawText("Este presupuesto tiene una validez de 30 días desde su fecha de emisión.", {
-      x: MARGIN, y: MARGIN + 10,
+    const qFooter = data.footer ?? {
+      paymentTerms: quoteConfig.paymentTerms,
+      quoteValidityDays: quoteConfig.quoteValidityDays,
+      companyRegistration: quoteConfig.companyRegistration,
+    };
+    let qLegalY = MARGIN + 10;
+    if (qFooter.companyRegistration) {
+      page.drawText(qFooter.companyRegistration, {
+        x: MARGIN, y: qLegalY,
+        font: regular, size: 7, color: C.midGray,
+      });
+      qLegalY += 12;
+    }
+    page.drawText(`Este presupuesto tiene una validez de ${qFooter.quoteValidityDays} días desde su fecha de emisión.`, {
+      x: MARGIN, y: qLegalY,
+      font: regular, size: 8, color: C.midGray,
+    });
+    qLegalY += 12;
+    page.drawText(qFooter.paymentTerms, {
+      x: MARGIN, y: qLegalY,
       font: regular, size: 8, color: C.midGray,
     });
 
@@ -460,23 +486,28 @@ export class PdfService {
     }
 
     // ── Legal texts (bottom, italic) ──────────────────────────────────────
+    const footer = data.footer ?? {
+      paymentTerms: quoteConfig.paymentTerms,
+      quoteValidityDays: quoteConfig.quoteValidityDays,
+      companyRegistration: quoteConfig.companyRegistration,
+    };
     let legalY = M + 36;
 
-    if (quoteConfig.companyRegistration) {
-      page.drawText(quoteConfig.companyRegistration, {
+    if (footer.companyRegistration) {
+      page.drawText(footer.companyRegistration, {
         x: M, y: legalY,
         font: italic, size: 7, color: C.midGray,
       });
       legalY += 12;
     }
 
-    page.drawText(`Este presupuesto tiene una validez de ${quoteConfig.quoteValidityDays} días.`, {
+    page.drawText(`Este presupuesto tiene una validez de ${footer.quoteValidityDays} días.`, {
       x: M, y: legalY,
       font: italic, size: 7.5, color: C.darkGray,
     });
     legalY += 12;
 
-    page.drawText(quoteConfig.paymentTerms, {
+    page.drawText(footer.paymentTerms, {
       x: M, y: legalY,
       font: italic, size: 7.5, color: C.darkGray,
     });

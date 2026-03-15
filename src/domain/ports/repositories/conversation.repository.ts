@@ -18,5 +18,6 @@ export interface ConversationRepository {
   findByTitle(title: string, userId: string): Promise<Pick<Conversation, "id"> | null>;
   create(data: NewConversation): Promise<Pick<Conversation, "id" | "title" | "createdAt">>;
   delete(id: string): Promise<boolean>;
+  updateTitle(id: string, title: string): Promise<void>;
   persistMessages(data: PersistMessagesData): Promise<void>;
 }

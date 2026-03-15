@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import type { Agent } from "@mastra/core/agent";
+import type { MastraMemory } from "@mastra/core/memory";
 import type { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
 import type { ConversationManager } from "../../application/managers/conversation.manager.js";
 import { buildAgentOptions } from "../../application/agent-context.js";
@@ -9,6 +10,7 @@ import { extractSources } from "../helpers/extract-sources.js";
 import { formatForWhatsApp, buildSourcesFooter } from "../helpers/format-whatsapp.js";
 import { ragConfig } from "../../plugins/rag/config/rag.config.js";
 import { pdfStore } from "../../plugins/quote/services/pdf-store.js";
+import { scheduleTitleSync } from "../../application/title-sync.js";
 
 export interface DocumentAttachment {
   base64: string;
@@ -53,16 +55,22 @@ function unwrapDelegationSteps(
     const delegationResult = allToolResults.find((r) => {
       const payload = (r as { payload?: { toolName?: string } }).payload;
       const name = payload?.toolName ?? "";
-      return name.startsWith("delegate-to-") || name.startsWith("delegateTo_");
+      return name.startsWith("delegate-to-") || name.startsWith("delegateTo_") || name.startsWith("agent-");
     });
 
     if (delegationResult) {
       const payload = (delegationResult as {
-        payload: { result?: { toolResults?: Array<unknown> } };
+        payload: { result?: { toolResults?: Array<unknown>; subAgentToolResults?: Array<unknown> } };
       }).payload;
-      const nested = payload.result?.toolResults ?? [];
+      // Support both manual delegation (toolResults) and Supervisor Pattern (subAgentToolResults)
+      const nested = payload.result?.toolResults ?? payload.result?.subAgentToolResults ?? [];
       if (nested.length > 0) {
-        unwrapped.push({ toolResults: nested });
+        // Normalize subAgentToolResults to the same shape as Mastra toolResults (wrap in payload)
+        const normalized = nested.map((r) => {
+          const asPayload = r as { payload?: unknown; toolName?: string };
+          return asPayload.payload ? r : { payload: r };
+        });
+        unwrapped.push({ toolResults: normalized });
       }
     } else {
       unwrapped.push(step);
@@ -76,6 +84,7 @@ export function createInternalController(
   waManager: WhatsAppManager,
   convManager: ConversationManager,
   agent: Agent,
+  memory?: MastraMemory,
 ): Hono {
   const router = new Hono();
 
@@ -155,6 +164,7 @@ export function createInternalController(
           model: ragConfig.llmModel,
           retrievedChunks: sources.map((s) => s.id),
         });
+        if (memory) scheduleTitleSync(memory, conversationId, convManager);
       } catch (persistError) {
         console.error("[internal/message] failed to persist messages:", persistError);
       }

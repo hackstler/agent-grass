@@ -20,6 +20,7 @@ export interface GrassPriceResult {
 export interface ActiveCatalog {
   id: string;
   businessType: string;
+  settings: Record<string, unknown> | null;
 }
 
 export class CatalogService {
@@ -30,7 +31,7 @@ export class CatalogService {
   async getActiveCatalog(orgId: string): Promise<ActiveCatalog | null> {
     // Try org-specific first
     const [orgCatalog] = await db
-      .select({ id: catalogs.id, businessType: catalogs.businessType })
+      .select({ id: catalogs.id, businessType: catalogs.businessType, settings: catalogs.settings })
       .from(catalogs)
       .where(and(eq(catalogs.orgId, orgId), eq(catalogs.isActive, true)))
       .limit(1);
@@ -39,7 +40,7 @@ export class CatalogService {
 
     // Fallback: any active catalog (single-tenant deployments)
     const [fallbackCatalog] = await db
-      .select({ id: catalogs.id, businessType: catalogs.businessType })
+      .select({ id: catalogs.id, businessType: catalogs.businessType, settings: catalogs.settings })
       .from(catalogs)
       .where(eq(catalogs.isActive, true))
       .limit(1);
