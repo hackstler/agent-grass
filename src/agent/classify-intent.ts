@@ -1,7 +1,21 @@
 import { generateObject } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
-import { ragConfig } from "../plugins/rag/config/rag.config.js";
+
+/**
+ * Lightweight intent classifier for the human-in-the-loop approval flow.
+ *
+ * Called by controllers BEFORE the agent pipeline starts, to decide whether
+ * to confirm/deny pending actions or treat the message as a new intent.
+ *
+ * Uses gemini-2.0-flash (cheapest, fastest) — classifying "sí"/"no" doesn't
+ * need the reasoning power of Pro. This is a single structured output call.
+ *
+ * Why a separate LLM call instead of the coordinator agent:
+ * The ExecutionContext must be updated BEFORE the agent runs. The coordinator
+ * is the agent — it can't classify first and then act, because needsApproval
+ * is evaluated during its execution. The context needs to be ready before that.
+ */
 
 const google = createGoogleGenerativeAI({
   apiKey: (process.env["GOOGLE_API_KEY"] ?? process.env["GOOGLE_GENERATIVE_AI_API_KEY"])!,
@@ -11,20 +25,13 @@ const intentSchema = z.object({
   intent: z.enum(["confirm", "deny", "new_intent"]),
 });
 
-/**
- * Uses the LLM to classify whether a user message is confirming a pending action,
- * denying it, or starting a completely new topic.
- *
- * Language-agnostic: works in Spanish, English, Catalan, emoji, slang, etc.
- * The LLM interprets the intent, not a regex.
- */
 export async function classifyConfirmationIntent(
   userMessage: string,
   pendingActionDescriptions: string[],
 ): Promise<"confirm" | "deny" | "new_intent"> {
   try {
     const result = await generateObject({
-      model: google("gemini-2.5-flash"),
+      model: google("gemini-2.0-flash"),
       schema: intentSchema,
       prompt: `The user was asked to confirm the following action(s):
 ${pendingActionDescriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
