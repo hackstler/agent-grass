@@ -31,7 +31,7 @@ export async function classifyConfirmationIntent(
 ): Promise<"confirm" | "deny" | "new_intent"> {
   try {
     const result = await generateObject({
-      model: google("gemini-2.0-flash"),
+      model: google("gemini-2.5-flash"),
       schema: intentSchema,
       prompt: `The user was asked to confirm the following action(s):
 ${pendingActionDescriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
