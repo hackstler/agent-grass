@@ -5,6 +5,7 @@ import type { AgentRunner } from "../../agent/agent-runner.js";
 import type { AgentStep, AgentGenerateResult, DelegationResult } from "../../agent/types.js";
 import { extractToolSummaries } from "../../agent/tool-summaries.js";
 import { getOrCreateExecutionContext } from "../../agent/execution-context.js";
+import { classifyConfirmationIntent } from "../../agent/classify-intent.js";
 import type { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
 import type { ConversationManager } from "../../application/managers/conversation.manager.js";
 import { createAgentContext } from "../../application/agent-context.js";
@@ -131,21 +132,23 @@ export function createInternalController(
       const pdfRequestId = randomUUID();
       const experimental_context = createAgentContext({ userId, orgId, conversationId, pdfRequestId });
 
-      // Human-in-the-loop: if there are pending approvals from the previous turn
-      // and the user sent a confirmation, confirm them before calling the agent.
+      // Human-in-the-loop: if there are pending approvals from the previous turn,
+      // use the LLM to classify whether the user's message is a confirmation, denial,
+      // or a completely new intent. No regex — the LLM handles any language or phrasing.
       const execCtx = getOrCreateExecutionContext(conversationId);
       if (execCtx.hasPending()) {
-        const isConfirmation = /^(s[ií]+|ok|dale|claro|vale|confirma|envía(lo)?|hazlo|yes|y)$/i.test(messageBody.trim());
-        const isDenial = /^(no|cancel(a|ar)?|nah)$/i.test(messageBody.trim());
+        const pendingDescriptions = execCtx.getPending().map((a) => a.description);
+        const intent = await classifyConfirmationIntent(messageBody, pendingDescriptions);
 
-        if (isConfirmation) {
+        if (intent === "confirm") {
           execCtx.confirmAll();
-          // Fall through — the agent will re-execute and needsApproval will find them confirmed
-        } else if (isDenial) {
+        } else if (intent === "deny") {
           execCtx.denyAll();
           return c.json({ data: { reply: "De acuerdo, acción cancelada. ¿En qué más puedo ayudarte?" } });
+        } else {
+          // New intent — clear pending actions and let the agent handle it fresh
+          execCtx.denyAll();
         }
-        // If neither confirmation nor denial, treat as a new intent (fall through to agent)
       }
 
       const history = await loadConversationHistory(convManager, conversationId);
