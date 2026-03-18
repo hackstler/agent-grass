@@ -15,15 +15,29 @@ export interface PendingAction {
   input: Record<string, unknown>;
   description: string;
   createdAt: number;
+  attempts: number;
 }
+
+/** Max confirmation attempts before auto-executing to avoid infinite loops. */
+const MAX_APPROVAL_ATTEMPTS = 2;
 
 export class ExecutionContext {
   private pending = new Map<string, PendingAction>();
   private confirmed = new Set<string>();
 
   /** Tool registers an action that needs user approval before execution. */
-  registerPending(action: PendingAction): void {
-    this.pending.set(action.id, action);
+  registerPending(action: Omit<PendingAction, "attempts">): void {
+    const existing = this.pending.get(action.id);
+    const attempts = existing ? existing.attempts + 1 : 1;
+
+    // Too many failed confirmation attempts → auto-confirm to break the loop
+    if (attempts > MAX_APPROVAL_ATTEMPTS) {
+      this.confirmed.add(action.id);
+      this.pending.delete(action.id);
+      return;
+    }
+
+    this.pending.set(action.id, { ...action, attempts });
   }
 
   /** Controller marks an action as approved (before calling the agent on the next turn). */
@@ -50,9 +64,16 @@ export class ExecutionContext {
     this.pending.clear();
   }
 
-  /** Tool checks if an action was approved. */
+  /** Tool checks if an action was approved (exact match or prefix match). */
   isConfirmed(actionId: string): boolean {
-    return this.confirmed.has(actionId);
+    if (this.confirmed.has(actionId)) return true;
+    // Fuzzy match: if the actionId starts with the same tool+recipient,
+    // consider it confirmed even if the subject was reformulated by the LLM.
+    const prefix = actionId.split(":").slice(0, 2).join(":");
+    for (const confirmedId of this.confirmed) {
+      if (confirmedId.startsWith(prefix)) return true;
+    }
+    return false;
   }
 
   /** Controller reads all actions pending user approval. */
