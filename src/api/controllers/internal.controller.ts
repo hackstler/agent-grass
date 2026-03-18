@@ -129,7 +129,7 @@ export function createInternalController(
 
       const pdfRequestId = randomUUID();
       const experimental_context = createAgentContext({ userId, orgId, conversationId, pdfRequestId });
-      const history = await loadConversationHistory(convManager, conversationId, 20);
+      const history = await loadConversationHistory(convManager, conversationId);
 
       let result: AgentGenerateResult | undefined;
       let replyText = "";

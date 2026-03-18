@@ -76,7 +76,7 @@ const defaultConfig: RagConfig = {
   enableStreaming: true,
 
   // Gemini in dev, OpenAI/Anthropic in prod
-  llmModel: process.env["GEMINI_MODEL"] ?? "gemini-2.5-flash",
+  llmModel: process.env["GEMINI_MODEL"] ?? "gemini-2.5-pro",
   embeddingModel: "gemini-embedding-001",
   embeddingDimensions: 768,
 

@@ -1,14 +1,15 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { AgentRunner } from "./agent-runner.js";
 import type { PluginRegistry } from "../plugins/plugin-registry.js";
+import type { ConversationManager } from "../application/managers/conversation.manager.js";
 import { ragConfig } from "../plugins/rag/config/rag.config.js";
 
 const google = createGoogleGenerativeAI({
   apiKey: (process.env["GOOGLE_API_KEY"] ?? process.env["GOOGLE_GENERATIVE_AI_API_KEY"])!,
 });
 
-export function createCoordinatorAgent(registry: PluginRegistry): AgentRunner {
-  const tools = registry.getDelegationTools();
+export function createCoordinatorAgent(registry: PluginRegistry, convManager: ConversationManager): AgentRunner {
+  const tools = registry.getDelegationTools(convManager);
 
   const lang = ragConfig.responseLanguage;
   const isSpanish = lang === "es";
@@ -66,22 +67,33 @@ Rules:
 9. Pass the user's EXACT message as the query parameter. Do NOT reinterpret or alter the user's product names or quantities.
 10. Return the delegated agent's response to the user as-is. Do not add your own commentary on top.
 
+== COMPLETED ACTIONS ==
+
+CRITICAL: Once you have confirmed an action to the user (e.g., "He enviado el correo", "He generado el presupuesto"), that flow is FINISHED.
+- Do NOT re-trigger the same action in the next turn unless the user EXPLICITLY asks to repeat it (e.g., "envía otro email", "haz otro presupuesto").
+- When the user's new message is about a DIFFERENT topic, treat it as a brand new intent. Ignore all previous flows completely.
+- A new question like "háblame sobre X" is NEVER a continuation of a previous email/quote/calendar flow — it is a fresh question.
+- Only delegate to ONE agent per turn unless the user explicitly asks for multiple actions in the SAME message (e.g., "haz un presupuesto y envíalo").
+
 == MULTI-STEP SEQUENCES ==
 
-Some tasks require chaining agents. Examples:
+Some tasks require chaining agents, but ONLY when the user asks for multiple actions in a SINGLE message:
 - "Hazme un presupuesto y envíalo por email" → first delegateTo_quote, then delegateTo_gmail with the PDF filename.
 - "Consulta el precio del X y hazme un presupuesto" → first delegateTo_catalog-manager, then delegateTo_quote.
 Execute steps sequentially, passing context from each result to the next delegation.
+NEVER chain agents across separate messages. Each new message from the user = fresh intent analysis.
 
 == CONFIRMATION HANDLING ==
 
-IMPORTANT: Sub-agents do NOT have memory. Each delegation is a fresh call.
-When the user sends a short confirmation like "sí", "claro", "dale", "ok", "envíalo", "hazlo":
+Sub-agents receive conversation history, so they understand context from previous turns.
+However, confirmations still need enrichment because the coordinator decides WHICH agent to call.
+When the user sends a SHORT confirmation like "sí", "claro", "dale", "ok", "envíalo", "hazlo" (1-3 words, no new topic):
 1. Look at your conversation history to find what was being confirmed.
 2. Delegate to the SAME agent as the previous turn, but include the FULL context in the query.
    Example: if the user previously asked to send an email and the Gmail agent asked for confirmation,
    and the user now says "sí", delegate to Gmail with: "CONFIRMED: Send email to X with subject Y and body Z."
 3. NEVER delegate a bare "sí" or "claro" — always enrich it with the full context from history.
+4. If the message contains a new topic or question (not just a confirmation word), treat it as a NEW intent, not a confirmation.
 
 == RESPONSE RULES ==
 

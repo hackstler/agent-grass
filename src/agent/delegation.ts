@@ -3,15 +3,21 @@ import { z } from "zod";
 import type { AgentTools, DelegationResult } from "./types.js";
 import type { Plugin } from "../plugins/plugin.interface.js";
 import { getAgentContextValue } from "../application/agent-context.js";
+import { loadConversationHistory } from "./load-history.js";
+import type { ConversationManager } from "../application/managers/conversation.manager.js";
+import { ragConfig } from "../plugins/rag/config/rag.config.js";
 
 /**
  * Creates a single delegation tool that wraps a plugin's agent.
  * The coordinator calls this tool to delegate work to the plugin's specialized agent.
  *
+ * Conversation history is loaded from the DB and passed to the sub-agent so it can
+ * understand context from previous turns (names, topics, references).
+ *
  * Returns a DelegationResult — the shared contract consumed by
  * chat.routes.ts (streaming SSE) and internal.controller.ts (WhatsApp).
  */
-function createDelegationTool(plugin: Plugin) {
+function createDelegationTool(plugin: Plugin, convManager: ConversationManager) {
   return tool({
     description: `Delegate to ${plugin.name}: ${plugin.description}`,
     inputSchema: z.object({
@@ -28,8 +34,14 @@ function createDelegationTool(plugin: Plugin) {
           ? { userId: userId ?? "anonymous", orgId, conversationId, ...(pdfRequestId && { pdfRequestId }) }
           : undefined;
 
+        // Load conversation history so the sub-agent has cross-turn context
+        const history = conversationId
+          ? await loadConversationHistory(convManager, conversationId, ragConfig.windowSize)
+          : [];
+
         const result = await plugin.agent.generate({
           prompt: query,
+          messages: history,
           ...(ctx ? { experimental_context: ctx } : {}),
         });
 
@@ -56,10 +68,10 @@ function createDelegationTool(plugin: Plugin) {
  * Creates delegation tools for all registered plugins.
  * Each plugin becomes a single tool the coordinator can invoke.
  */
-export function createDelegationTools(plugins: Plugin[]): AgentTools {
+export function createDelegationTools(plugins: Plugin[], convManager: ConversationManager): AgentTools {
   const tools: AgentTools = {};
   for (const plugin of plugins) {
-    const t = createDelegationTool(plugin);
+    const t = createDelegationTool(plugin, convManager);
     tools[`delegateTo_${plugin.id}`] = t;
   }
   return tools;

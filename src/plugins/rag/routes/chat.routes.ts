@@ -43,7 +43,7 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
     const conversationId = await resolveConversationId(parsed.data.conversationId, convManager, userId, query);
 
     const experimental_context = createAgentContext({ userId: userId ?? "anonymous", orgId, conversationId });
-    const history = await loadConversationHistory(convManager, conversationId, 20);
+    const history = await loadConversationHistory(convManager, conversationId);
 
     const result = await agent.generate({ prompt: query, messages: history, experimental_context });
 
@@ -127,7 +127,7 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
           orgId,
           conversationId,
         });
-        const history = await loadConversationHistory(convManager, conversationId, 20);
+        const history = await loadConversationHistory(convManager, conversationId);
 
         // Persist user message BEFORE streaming — survives stream failures
         try {

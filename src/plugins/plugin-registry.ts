@@ -1,6 +1,7 @@
 import type { Hono } from "hono";
 import type { AgentTools } from "../agent/types.js";
 import type { Plugin } from "./plugin.interface.js";
+import type { ConversationManager } from "../application/managers/conversation.manager.js";
 import { createDelegationTools } from "../agent/delegation.js";
 
 export class PluginRegistry {
@@ -34,8 +35,8 @@ export class PluginRegistry {
     return tools;
   }
 
-  getDelegationTools(): AgentTools {
-    return createDelegationTools(this.getAll());
+  getDelegationTools(convManager: ConversationManager): AgentTools {
+    return createDelegationTools(this.getAll(), convManager);
   }
 
   mountRoutes(app: Hono): void {

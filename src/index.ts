@@ -93,8 +93,8 @@ pluginRegistry.register(new CalendarPlugin(oauthProvider));
 pluginRegistry.register(new QuotePlugin({ attachmentStore, organizationRepo: orgRepo, quoteRepo }));
 pluginRegistry.register(new CatalogManagerPlugin({ catalogManager, catalogRepo }));
 
-// 5. Coordinator agent (uses all plugin tools)
-const coordinatorAgent = createCoordinatorAgent(pluginRegistry);
+// 5. Coordinator agent (uses all plugin tools + conversation history for sub-agents)
+const coordinatorAgent = createCoordinatorAgent(pluginRegistry, convManager);
 
 // Wire coordinator + convManager + memory into RAG plugin so /chat uses coordinator (enables Gmail/Calendar from dashboard)
 ragPlugin.setCoordinatorAgent(coordinatorAgent);
