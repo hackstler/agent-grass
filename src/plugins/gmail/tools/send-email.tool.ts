@@ -55,7 +55,7 @@ exactly as shown when it was generated (e.g., "PRES-20260306-1234.pdf").`,
         id: actionId,
         toolName: "sendEmail",
         input: input as Record<string, unknown>,
-        description: `Enviar email a ${input.to} — asunto: "${input.subject}"${input.attachmentFilename ? ` — adjunto: ${input.attachmentFilename}` : ""}`,
+        description: `Enviar email a ${input.to}\n• *Asunto:* ${input.subject}\n• *Cuerpo:* ${input.body}${input.attachmentFilename ? `\n• *Adjunto:* ${input.attachmentFilename}` : ""}`,
         createdAt: Date.now(),
       });
 
