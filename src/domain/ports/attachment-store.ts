@@ -19,4 +19,6 @@ export interface AttachmentStore {
   store(filename: string, attachment: StoredAttachment): void;
   /** Retrieve an attachment by filename. Returns null if not found or expired. */
   retrieve(filename: string): StoredAttachment | null;
+  /** Find the most recently stored attachment matching a filename prefix (e.g., "PRES-"). */
+  findLatestByPrefix(prefix: string): StoredAttachment | null;
 }

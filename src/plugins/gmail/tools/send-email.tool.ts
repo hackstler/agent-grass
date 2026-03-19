@@ -47,6 +47,14 @@ exactly as shown when it was generated (e.g., "PRES-20260306-1234.pdf").`,
           throw new Error(`Attachment "${attachmentFilename}" not found. It may have expired or was never generated. Generate the document first, then try again.`);
         }
         attachment = stored;
+      } else {
+        // Fallback: if the LLM didn't pass a filename, look for the latest
+        // generated quote PDF. This makes attachment deterministic — it doesn't
+        // depend on the LLM remembering to pass the filename across turns.
+        const latestPdf = attachmentStore.findLatestByPrefix("PRES-");
+        if (latestPdf) {
+          attachment = latestPdf;
+        }
       }
 
       const result = await gmailService.sendEmail(userId, to, subject, body, attachment);

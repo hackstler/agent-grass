@@ -39,6 +39,20 @@ export class InMemoryAttachmentStore implements AttachmentStore {
     return entry.attachment;
   }
 
+  findLatestByPrefix(prefix: string): StoredAttachment | null {
+    this.cleanup();
+    let latest: CacheEntry | null = null;
+    for (const [key, entry] of this.cache) {
+      if (key.startsWith(prefix) && (!latest || entry.timestamp > latest.timestamp)) {
+        latest = entry;
+      }
+    }
+    if (latest) {
+      console.log(`[attachmentStore] prefix match: ${prefix}* → ${latest.attachment.filename}`);
+    }
+    return latest?.attachment ?? null;
+  }
+
   private cleanup(): void {
     const cutoff = Date.now() - this.maxAgeMs;
     for (const [key, entry] of this.cache) {
