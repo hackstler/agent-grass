@@ -67,12 +67,13 @@ export function createWebhookController(
     }
 
     // 3. Parse Kapso v2 payload
-    const data = payload?.data;
+    console.log("[webhook] payload:", JSON.stringify(payload).slice(0, 500));
+    const data = payload?.data ?? payload;
     const message = data?.message;
     const conversation = data?.conversation;
 
-    if (!message || message.type !== "text" || !message.text?.body) {
-      // Not a text message (could be image, status update, etc.) — ack and skip
+    if (!message || !message.text?.body) {
+      console.log("[webhook] skipping: no text body", { hasMessage: !!message, type: message?.type });
       return c.json({ ok: true });
     }
 
@@ -87,6 +88,7 @@ export function createWebhookController(
     }
 
     // 4. Respond 200 immediately — process async to avoid Kapso 10s timeout
+    console.log("[webhook] processing:", { messageId, customerPhone, phoneNumberId, text: messageText.slice(0, 50) });
     const asyncProcess = async () => {
       try {
         // 5. Resolve org by phoneNumberId
