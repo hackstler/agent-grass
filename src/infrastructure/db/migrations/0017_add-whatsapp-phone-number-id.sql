@@ -1,0 +1,1 @@
+ALTER TABLE "organizations" ADD COLUMN "whatsapp_phone_number_id" text;

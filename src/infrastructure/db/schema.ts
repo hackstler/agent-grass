@@ -89,6 +89,7 @@ export const organizations = pgTable("organizations", {
   currency: text("currency").notNull().default("€"),
   features: jsonb("features").$type<OrgFeatures>().default({}),
   quoteSettings: jsonb("quote_settings").$type<QuoteSettings>(),
+  whatsappPhoneNumberId: text("whatsapp_phone_number_id"),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

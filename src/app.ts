@@ -31,7 +31,10 @@ import { createTopicController } from "./api/controllers/topic.controller.js";
 import { createOAuthController } from "./api/controllers/oauth.controller.js";
 import { createCatalogController } from "./api/controllers/catalog.controller.js";
 import { createQuoteController } from "./api/controllers/quote.controller.js";
+import { createWebhookController } from "./api/controllers/webhook.controller.js";
 import health from "./api/health.js";
+import type { WhatsAppChannel } from "./domain/ports/whatsapp-channel.js";
+import type { AttachmentStore } from "./domain/ports/attachment-store.js";
 
 export interface AppDependencies {
   userManager: UserManager;
@@ -49,6 +52,8 @@ export interface AppDependencies {
   invitationManager?: InvitationManager;
   quoteRepo?: QuoteRepository;
   organizationRepo?: OrganizationRepository;
+  whatsappChannel?: WhatsAppChannel;
+  attachmentStore?: AttachmentStore;
 }
 
 export function createApp(deps: AppDependencies): Hono {
@@ -136,6 +141,14 @@ export function createApp(deps: AppDependencies): Hono {
   if (deps.quoteRepo) {
     app.use("/quotes/*", auth);
     app.route("/quotes", createQuoteController(deps.quoteRepo));
+  }
+
+  // Kapso WhatsApp webhooks — NO auth middleware (uses HMAC signature verification internally)
+  if (deps.whatsappChannel && deps.organizationRepo && deps.attachmentStore) {
+    app.route("/webhooks", createWebhookController(
+      deps.coordinatorAgent, deps.convManager, deps.organizationRepo,
+      deps.whatsappChannel, deps.attachmentStore,
+    ));
   }
 
   // Internal worker endpoints — worker JWT auth

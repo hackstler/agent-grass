@@ -101,6 +101,12 @@ ragPlugin.setCoordinatorAgent(coordinatorAgent);
 ragPlugin.setConversationManager(convManager);
 ragPlugin.setAttachmentStore(attachmentStore);
 
+// 5b. Kapso WhatsApp channel (optional — only if KAPSO_API_KEY is set)
+import { KapsoChannel } from "./infrastructure/whatsapp/kapso-channel.js";
+const whatsappChannel = process.env["KAPSO_API_KEY"]
+  ? new KapsoChannel(process.env["KAPSO_API_KEY"])
+  : undefined;
+
 // 6. Create app
 const app = createApp({
   userManager,
@@ -118,6 +124,8 @@ const app = createApp({
   invitationManager,
   quoteRepo,
   organizationRepo: orgRepo,
+  ...(whatsappChannel ? { whatsappChannel } : {}),
+  attachmentStore,
 });
 
 // ── Startup ────────────────────────────────────────────────────────────────────

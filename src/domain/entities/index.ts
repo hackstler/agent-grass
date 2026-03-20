@@ -210,6 +210,7 @@ export interface Organization {
   currency: string;
   features: OrgFeatures | null;
   quoteSettings: QuoteSettings | null;
+  whatsappPhoneNumberId: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: Date;
   updatedAt: Date;
@@ -230,6 +231,7 @@ export interface NewOrganization {
   currency?: string | undefined;
   features?: OrgFeatures | null | undefined;
   quoteSettings?: QuoteSettings | null | undefined;
+  whatsappPhoneNumberId?: string | null | undefined;
   metadata?: Record<string, unknown> | null | undefined;
   createdAt?: Date | undefined;
   updatedAt?: Date | undefined;
