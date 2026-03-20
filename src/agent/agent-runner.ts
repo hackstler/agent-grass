@@ -63,7 +63,7 @@ export class AgentRunner {
       steps: result.steps.map((step) => ({
         toolResults: (step.toolResults ?? []).map((tr) => ({
           toolName: tr.toolName,
-          result: (tr as { result?: unknown }).result,
+          result: (tr as { output?: unknown }).output ?? (tr as { result?: unknown }).result,
         })),
       })),
     };

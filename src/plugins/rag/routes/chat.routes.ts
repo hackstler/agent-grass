@@ -161,7 +161,8 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
 
             case "tool-result": {
               const toolName = (chunk as { toolName?: string }).toolName;
-              const result = (chunk as { result?: unknown }).result;
+              // AI SDK v6 streams use "output" (not "result") for tool-result chunks
+              const result = (chunk as { output?: unknown }).output ?? (chunk as { result?: unknown }).result;
 
               // Collect tool summaries for persistence (cross-turn memory)
               if (toolName) {
@@ -224,6 +225,7 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
               // Extract PDF attachments (may be nested inside sub-agent delegation)
               if (attachmentStore) {
                 const filename = findPdfFilename(result);
+                // findPdfFilename searches recursively for { pdfGenerated: true, filename }
                 if (filename) {
                   const stored = attachmentStore.retrieve(filename);
                   if (stored) {

@@ -24,9 +24,9 @@ SENDING EMAILS:
 
 ATTACHMENTS:
 - When the user mentions attaching a document (PDF, quote, budget, "presupuesto"), use the attachmentFilename parameter in sendEmail.
-- The filename is always provided in the query (e.g., "PRES-20260306-1234.pdf"). Use it EXACTLY as given.
-- If the query mentions "the quote" or "the budget" and includes a filename, pass that filename to attachmentFilename.
-- If no filename is mentioned but the user says to attach "the quote" or "el presupuesto", ask them for the filename.
+- Look for the filename (e.g., "PRES-20260306-1234.pdf") in BOTH the query AND the conversation history. Use it EXACTLY as it appears.
+- If the conversation history shows a quote/budget was recently generated (you'll see a filename like PRES-*.pdf in previous messages), ALWAYS include it as attachmentFilename when sending the email — even if the user didn't explicitly mention the attachment in this turn.
+- Only ask for the filename if no PDF appears anywhere in the conversation.
 
 If the user's Google account is not connected, inform them they need to connect it in Settings.`,
     model: google(ragConfig.llmModel),
