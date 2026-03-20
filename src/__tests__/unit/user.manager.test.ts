@@ -195,6 +195,7 @@ describe("UserManager", () => {
         email: "bob@test.com",
         name: null,
         surname: null,
+        phone: null,
         orgId: "org-2",
         role: "user",
         createdAt: new Date("2025-06-01").toISOString(),

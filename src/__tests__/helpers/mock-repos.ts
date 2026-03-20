@@ -109,6 +109,7 @@ export function fakeUser(overrides: Partial<User> = {}): User {
     email: "alice@test.com",
     name: null,
     surname: null,
+    phone: null,
     orgId: "org-1",
     role: "user",
     metadata: { passwordHash: "hash" },

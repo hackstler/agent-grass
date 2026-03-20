@@ -57,6 +57,7 @@ export interface UserListItem {
   email: string | null;
   name: string | null;
   surname: string | null;
+  phone: string | null;
   orgId: string;
   role: string;
   createdAt: string;
@@ -133,6 +134,7 @@ export class UserManager {
       email: u.email,
       name: u.name,
       surname: u.surname,
+      phone: u.phone ?? null,
       orgId: u.orgId,
       role: u.role,
       createdAt: u.createdAt.toISOString(),
@@ -159,6 +161,7 @@ export class UserManager {
       email: user.email,
       name: user.name,
       surname: user.surname,
+      phone: user.phone ?? null,
       orgId: user.orgId,
       role,
       createdAt: user.createdAt.toISOString(),
@@ -199,6 +202,7 @@ export class UserManager {
       email: user.email,
       name: user.name,
       surname: user.surname,
+      phone: user.phone ?? null,
       orgId: user.orgId,
       role,
       createdAt: user.createdAt.toISOString(),
@@ -266,6 +270,7 @@ export class UserManager {
       email: updated.email,
       name: updated.name,
       surname: updated.surname,
+      phone: updated.phone ?? null,
       orgId: updated.orgId,
       role: updated.role,
       createdAt: updated.createdAt.toISOString(),
@@ -306,6 +311,7 @@ export class UserManager {
       email?: string | undefined;
       name?: string | undefined;
       surname?: string | undefined;
+      phone?: string | undefined;
       password?: string | undefined;
       onboardingComplete?: boolean | undefined;
       firstName?: string | undefined;
@@ -330,6 +336,7 @@ export class UserManager {
     if (normalizedEmail) updateData["email"] = normalizedEmail;
     if (dto.name !== undefined) updateData["name"] = this.trimOrNull(dto.name);
     if (dto.surname !== undefined) updateData["surname"] = this.trimOrNull(dto.surname);
+    if (dto.phone !== undefined) updateData["phone"] = this.trimOrNull(dto.phone);
 
     // Merge metadata fields
     const metadataUpdates: Record<string, unknown> = {};
@@ -353,6 +360,7 @@ export class UserManager {
       email: updated.email,
       name: updated.name,
       surname: updated.surname,
+      phone: updated.phone ?? null,
       orgId: updated.orgId,
       role: updated.role,
       createdAt: updated.createdAt.toISOString(),

@@ -11,6 +11,7 @@ const updateProfileValidator = z.object({
   email: z.string().email().max(255).optional(),
   name: z.string().max(100).optional(),
   surname: z.string().max(100).optional(),
+  phone: z.string().max(30).optional(),
   password: z.string().min(8).optional(),
   onboardingComplete: z.boolean().optional(),
   firstName: z.string().max(100).optional(),
@@ -275,6 +276,7 @@ export function createAuthController(
       email: user.email,
       name: fullUser.name,
       surname: fullUser.surname,
+      phone: fullUser.phone ?? null,
       orgId: user.orgId,
       role: user.role,
       onboardingComplete: meta?.["onboardingComplete"] !== false, // default true for existing users
@@ -308,9 +310,10 @@ export function createAuthController(
     }
 
     try {
-      const { onboardingComplete, firstName, lastName, ...rest } = parsed.data;
+      const { onboardingComplete, firstName, lastName, phone, ...rest } = parsed.data;
       const updated = await manager.updateSelf(user.userId, {
         ...rest,
+        phone,
         onboardingComplete,
         firstName,
         lastName,
