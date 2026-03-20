@@ -18,6 +18,13 @@ export class DrizzleOrganizationRepository implements OrganizationRepository {
     return result ?? null;
   }
 
+  async findByWhatsappPhoneNumberId(phoneNumberId: string): Promise<Organization | null> {
+    const result = await db.query.organizations.findFirst({
+      where: eq(organizations.whatsappPhoneNumberId, phoneNumberId),
+    });
+    return result ?? null;
+  }
+
   async create(data: NewOrganization): Promise<Organization> {
     const [org] = await db.insert(organizations).values(data).returning();
     return org!;
