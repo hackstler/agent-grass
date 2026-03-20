@@ -1,6 +1,6 @@
 import type { WhatsAppChannel } from "../../domain/ports/whatsapp-channel.js";
 
-const KAPSO_BASE = "https://api.kapso.ai/v1";
+const KAPSO_BASE = "https://api.kapso.ai/meta/whatsapp/v24.0";
 
 /**
  * Kapso implementation of WhatsAppChannel.
@@ -13,13 +13,15 @@ export class KapsoChannel implements WhatsAppChannel {
   constructor(private readonly apiKey: string) {}
 
   async sendText(phoneNumberId: string, to: string, body: string): Promise<void> {
-    const res = await fetch(`${KAPSO_BASE}/whatsapp/phone-numbers/${phoneNumberId}/messages`, {
+    const res = await fetch(`${KAPSO_BASE}/${phoneNumberId}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-API-Key": this.apiKey,
       },
       body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
         to,
         type: "text",
         text: { body },
@@ -43,7 +45,7 @@ export class KapsoChannel implements WhatsAppChannel {
     formData.append("file", new Blob([buffer], { type: doc.mimetype }), doc.filename);
     formData.append("messaging_product", "whatsapp");
 
-    const uploadRes = await fetch(`${KAPSO_BASE}/whatsapp/phone-numbers/${phoneNumberId}/media`, {
+    const uploadRes = await fetch(`${KAPSO_BASE}/${phoneNumberId}/media`, {
       method: "POST",
       headers: { "X-API-Key": this.apiKey },
       body: formData,
@@ -58,13 +60,15 @@ export class KapsoChannel implements WhatsAppChannel {
     const { id: mediaId } = await uploadRes.json() as { id: string };
 
     // Step 2: Send document message with media ID
-    const res = await fetch(`${KAPSO_BASE}/whatsapp/phone-numbers/${phoneNumberId}/messages`, {
+    const res = await fetch(`${KAPSO_BASE}/${phoneNumberId}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-API-Key": this.apiKey,
       },
       body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
         to,
         type: "document",
         document: { id: mediaId, filename: doc.filename },
