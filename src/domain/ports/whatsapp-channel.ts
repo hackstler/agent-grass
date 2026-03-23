@@ -12,4 +12,10 @@ export interface WhatsAppChannel {
     filename: string;
     mimetype: string;
   }): Promise<void>;
+  /**
+   * Send a typing indicator ("writing...") and mark the inbound message as read.
+   * The indicator lasts up to 25 seconds or until a message is sent — whichever comes first.
+   * Fire-and-forget: failures should be logged but never block the main flow.
+   */
+  sendTypingIndicator(phoneNumberId: string, messageId: string): Promise<void>;
 }

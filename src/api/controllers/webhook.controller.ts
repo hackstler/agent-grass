@@ -117,6 +117,9 @@ export function createWebhookController(
     const userId = user.id;
     const orgId = user.orgId;
 
+    // Send typing indicator + mark as read (fire-and-forget, before agent processing)
+    whatsapp.sendTypingIndicator(phoneNumberId, messageId).catch(() => {});
+
     // Resolve conversation
     const conversationId = await convManager.resolveOrCreateForChannel(
       `kapso:${customerPhone}`,

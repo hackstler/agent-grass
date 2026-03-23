@@ -81,4 +81,30 @@ export class KapsoChannel implements WhatsAppChannel {
       logger.error({ statusCode: res.status, responseBody: err }, "sendDocument failed");
     }
   }
+
+  async sendTypingIndicator(phoneNumberId: string, messageId: string): Promise<void> {
+    try {
+      const res = await fetch(`${KAPSO_BASE}/${phoneNumberId}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": this.apiKey,
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          status: "read",
+          message_id: messageId,
+          typing_indicator: { type: "text" },
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text().catch(() => "");
+        logger.warn({ statusCode: res.status, responseBody: err }, "sendTypingIndicator failed (non-blocking)");
+      }
+    } catch (err) {
+      // Fire-and-forget: never block the main message processing flow
+      logger.warn({ err }, "sendTypingIndicator error (non-blocking)");
+    }
+  }
 }
