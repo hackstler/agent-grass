@@ -37,7 +37,8 @@ import { CatalogManagerPlugin } from "./plugins/catalog-manager/index.js";
 import { OAuthManagerAdapter } from "./plugins/google-common/oauth-manager-adapter.js";
 
 // Shared stores
-import { InMemoryAttachmentStore } from "./infrastructure/stores/in-memory-attachment-store.js";
+import { DrizzleAttachmentRepository } from "./infrastructure/repositories/drizzle-attachment.repository.js";
+import { PersistentAttachmentStore } from "./infrastructure/stores/persistent-attachment-store.js";
 
 // Coordinator agent
 import { createCoordinatorAgent } from "./agent/coordinator.js";
@@ -88,7 +89,8 @@ const ragPlugin = new RagPlugin();
 pluginRegistry.register(ragPlugin);
 
 const oauthProvider = new OAuthManagerAdapter(oauthManager);
-const attachmentStore = new InMemoryAttachmentStore();
+const attachmentRepo = new DrizzleAttachmentRepository();
+const attachmentStore = new PersistentAttachmentStore(attachmentRepo);
 pluginRegistry.register(new GmailPlugin(oauthProvider, attachmentStore));
 pluginRegistry.register(new CalendarPlugin(oauthProvider));
 pluginRegistry.register(new QuotePlugin({ attachmentStore, organizationRepo: orgRepo, quoteRepo }));

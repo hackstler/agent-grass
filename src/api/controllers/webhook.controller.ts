@@ -11,6 +11,7 @@ import { createAgentContext } from "../../application/agent-context.js";
 import { loadConversationHistory } from "../../agent/load-history.js";
 import { extractSources } from "../helpers/extract-sources.js";
 import { extractToolSummaries } from "../../agent/tool-summaries.js";
+import { findPdfFilename } from "../helpers/find-pdf-filename.js";
 import { ragConfig } from "../../plugins/rag/config/rag.config.js";
 
 // Dedup: track processed idempotency keys to avoid duplicate responses
@@ -127,12 +128,7 @@ export function createWebhookController(
       `WhatsApp: ${customerPhone}`,
     );
 
-    // Agent context + history
-    const experimental_context = createAgentContext({
-      userId,
-      orgId,
-      conversationId,
-    });
+    const experimental_context = createAgentContext({ userId, orgId, conversationId });
     const history = await loadConversationHistory(convManager, conversationId);
 
     // Run agent
@@ -164,10 +160,24 @@ export function createWebhookController(
     // Reply
     await whatsapp.sendText(phoneNumberId, customerPhone, replyText);
 
-    // PDF if generated
-    const pdf = attachmentStore.findLatestByPrefix("PRES-");
-    if (pdf) {
-      await whatsapp.sendDocument(phoneNumberId, customerPhone, pdf);
+    // PDF: only if this specific request generated one AND the agent didn't
+    // already send it via Gmail (avoids duplicate delivery).
+    const delegatedToGmail = result.steps.some((s) =>
+      s.toolResults.some((r) => r.toolName === "delegateTo_gmail"),
+    );
+    if (!delegatedToGmail) {
+      const filename = findPdfFilename(result);
+      if (filename) {
+        const stored = await attachmentStore.retrieve(userId, filename);
+        if (stored) {
+          await whatsapp.sendDocument(phoneNumberId, customerPhone, {
+            base64: stored.base64,
+            mimetype: stored.mimetype,
+            filename: stored.filename,
+          });
+          logger.info({ filename: stored.filename }, "PDF sent via Kapso webhook");
+        }
+      }
     }
   }
 

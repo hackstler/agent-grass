@@ -9,7 +9,6 @@ export function createAgentContext(params: AgentContextParams): AgentContext {
     userId: params.userId,
     orgId: params.orgId,
     conversationId: params.conversationId,
-    ...(params.pdfRequestId ? { pdfRequestId: params.pdfRequestId } : {}),
   };
 }
 

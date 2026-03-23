@@ -1,18 +1,18 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { randomUUID } from "crypto";
 import { logger } from "../../shared/logger.js";
 import type { AgentRunner } from "../../agent/agent-runner.js";
 import type { AgentStep, AgentGenerateResult, DelegationResult } from "../../agent/types.js";
 import { extractToolSummaries } from "../../agent/tool-summaries.js";
 import type { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
 import type { ConversationManager } from "../../application/managers/conversation.manager.js";
+import type { AttachmentStore } from "../../domain/ports/attachment-store.js";
 import { createAgentContext } from "../../application/agent-context.js";
 import { loadConversationHistory } from "../../agent/load-history.js";
 import { extractSources } from "../helpers/extract-sources.js";
 import { formatForWhatsApp, buildSourcesFooter } from "../helpers/format-whatsapp.js";
+import { findPdfFilename } from "../helpers/find-pdf-filename.js";
 import { ragConfig } from "../../plugins/rag/config/rag.config.js";
-import { pdfStore } from "../../plugins/quote/services/pdf-store.js";
 
 export interface DocumentAttachment {
   base64: string;
@@ -73,6 +73,7 @@ export function createInternalController(
   waManager: WhatsAppManager,
   convManager: ConversationManager,
   agent: AgentRunner,
+  attachmentStore: AttachmentStore,
 ): Hono {
   const router = new Hono();
 
@@ -128,8 +129,7 @@ export function createInternalController(
         `WhatsApp: ${chatId}`,
       );
 
-      const pdfRequestId = randomUUID();
-      const experimental_context = createAgentContext({ userId, orgId, conversationId, pdfRequestId });
+      const experimental_context = createAgentContext({ userId, orgId, conversationId });
       const history = await loadConversationHistory(convManager, conversationId);
 
       let result: AgentGenerateResult | undefined;
@@ -173,7 +173,7 @@ export function createInternalController(
 
       const waText = formatForWhatsApp(replyText) + buildSourcesFooter(sources);
 
-      // PDF retrieval: keyed by pdfRequestId (UUID) via experimental_context.
+      // PDF retrieval: extract filename from tool results, retrieve from persistent store.
       // Only attach PDF to WhatsApp when the user's request was about GENERATING a quote,
       // not when they asked to send it by email (gmail handles the attachment itself).
       let document: DocumentAttachment | null = null;
@@ -181,18 +181,19 @@ export function createInternalController(
         s.toolResults.some((r) => r.toolName === "delegateTo_gmail"),
       );
       if (!delegatedToGmail) {
-        const storeEntry = pdfStore.take(pdfRequestId);
-        if (storeEntry) {
-          document = {
-            base64: storeEntry.pdfBase64,
-            mimetype: "application/pdf",
-            filename: storeEntry.filename,
-          };
-          logger.info({ filename: document.filename }, "PDF attached to WhatsApp reply");
+        const filename = findPdfFilename(result);
+        if (filename) {
+          const stored = await attachmentStore.retrieve(userId, filename);
+          if (stored) {
+            document = {
+              base64: stored.base64,
+              mimetype: stored.mimetype,
+              filename: stored.filename,
+            };
+            logger.info({ filename: document.filename }, "PDF attached to WhatsApp reply");
+          }
         }
       } else {
-        // Clean up any PDF that was generated in this turn (e.g. coordinator re-delegated to quote)
-        pdfStore.take(pdfRequestId);
         logger.info("Skipping PDF attachment — email flow handled attachment via Gmail");
       }
 

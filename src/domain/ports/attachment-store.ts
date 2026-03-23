@@ -14,11 +14,27 @@ export interface StoredAttachment {
   filename: string;
 }
 
+export interface AttachmentMetadata {
+  filename: string;
+  docType: string;
+  sourceId: string | null;
+  createdAt: Date;
+}
+
 export interface AttachmentStore {
-  /** Store an attachment keyed by filename. Overwrites if the key already exists. */
-  store(filename: string, attachment: StoredAttachment): void;
-  /** Retrieve an attachment by filename. Returns null if not found or expired. */
-  retrieve(filename: string): StoredAttachment | null;
-  /** Find the most recently stored attachment matching a filename prefix (e.g., "PRES-"). */
-  findLatestByPrefix(prefix: string): StoredAttachment | null;
+  /** Store an attachment keyed by userId + filename. Overwrites if the key already exists. */
+  store(params: {
+    orgId: string;
+    userId: string;
+    filename: string;
+    attachment: StoredAttachment;
+    docType: string;
+    sourceId?: string;
+  }): Promise<void>;
+
+  /** Retrieve an attachment by userId + filename. Returns null if not found. */
+  retrieve(userId: string, filename: string): Promise<StoredAttachment | null>;
+
+  /** List attachment metadata for a user, optionally filtered by docType. */
+  list(userId: string, docType?: string): Promise<AttachmentMetadata[]>;
 }

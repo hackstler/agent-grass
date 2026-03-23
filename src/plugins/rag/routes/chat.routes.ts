@@ -7,6 +7,7 @@ import type { DelegationResult } from "../../../agent/types.js";
 import { extractToolSummaries, summarizeToolCall } from "../../../agent/tool-summaries.js";
 import { ragConfig } from "../config/rag.config.js";
 import { extractSources } from "../../../api/helpers/extract-sources.js";
+import { findPdfFilename } from "../../../api/helpers/find-pdf-filename.js";
 import { createAgentContext } from "../../../application/agent-context.js";
 import { loadConversationHistory } from "../../../agent/load-history.js";
 import type { ConversationManager } from "../../../application/managers/conversation.manager.js";
@@ -231,7 +232,7 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
                 if (isQuoteTool) {
                   const filename = findPdfFilename(result);
                   if (filename) {
-                    const stored = attachmentStore.retrieve(filename);
+                    const stored = await attachmentStore.retrieve(userId ?? "anonymous", filename);
                     if (stored) {
                       await emit({ type: "attachment", filename: stored.filename, base64: stored.base64 });
                       attachmentEmitted = true;
@@ -325,36 +326,6 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
 // ============================================================
 // Helpers
 // ============================================================
-
-/**
- * Recursively searches a tool result for { pdfGenerated: true, filename: "*.pdf" }.
- * Handles both direct calculateBudget results and nested sub-agent delegation results.
- */
-function findPdfFilename(obj: unknown, depth = 0): string | null {
-  if (!obj || typeof obj !== "object" || depth > 5) return null;
-
-  const record = obj as Record<string, unknown>;
-
-  // Direct match: calculateBudget result shape
-  if (record["pdfGenerated"] === true && typeof record["filename"] === "string") {
-    return record["filename"] as string;
-  }
-
-  // Recurse into nested objects/arrays (sub-agent delegation wraps results)
-  for (const value of Object.values(record)) {
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        const found = findPdfFilename(item, depth + 1);
-        if (found) return found;
-      }
-    } else if (value && typeof value === "object") {
-      const found = findPdfFilename(value, depth + 1);
-      if (found) return found;
-    }
-  }
-
-  return null;
-}
 
 async function resolveConversationId(
   id: string | undefined,

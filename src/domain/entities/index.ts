@@ -13,13 +13,12 @@ export interface AgentContextParams {
   userId: string;
   orgId: string;
   conversationId: string;
-  pdfRequestId?: string;
   /** Hook: fires after the entire agent execution completes. */
   onFinish?: (event: any) => void | Promise<void>;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-export type AgentContextKey = "userId" | "orgId" | "conversationId" | "pdfRequestId";
+export type AgentContextKey = "userId" | "orgId" | "conversationId";
 
 // ── User ────────────────────────────────────────────────────────────────────────
 

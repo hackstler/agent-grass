@@ -7,6 +7,7 @@ import { CatalogService } from "./services/catalog.service.js";
 import { PdfService } from "./services/pdf.service.js";
 import { createCalculateBudgetTool } from "./tools/calculate-budget.tool.js";
 import { createListCatalogTool } from "./tools/list-catalog.tool.js";
+import { createListQuotesTool } from "./tools/list-quotes.tool.js";
 import { createQuoteAgent } from "./quote.agent.js";
 import { QuoteStrategyRegistry } from "./strategies/index.js";
 
@@ -33,9 +34,10 @@ export class QuotePlugin implements Plugin {
       catalogService, pdfService, attachmentStore, organizationRepo, quoteRepo, strategyRegistry,
     });
     const listCatalog = createListCatalogTool({ catalogService, strategy: defaultStrategy });
+    const listQuotes = createListQuotesTool({ quoteRepo });
 
-    this.description = `Generates price quotes and PDF invoices for ${defaultStrategy.displayName}.`;
-    this.tools = { calculateBudget, listCatalog };
+    this.description = `Generates price quotes and PDF invoices for ${defaultStrategy.displayName}. Can also list previously generated quotes.`;
+    this.tools = { calculateBudget, listCatalog, listQuotes };
     this.agent = createQuoteAgent(this.tools, defaultStrategy);
   }
 

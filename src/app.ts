@@ -156,7 +156,7 @@ export function createApp(deps: AppDependencies): Hono {
   // Internal worker endpoints — worker JWT auth
   const workerAuth = requireWorker();
   app.use("/internal/*", workerAuth);
-  app.route("/internal", createInternalController(deps.waManager, deps.convManager, deps.coordinatorAgent));
+  app.route("/internal", createInternalController(deps.waManager, deps.convManager, deps.coordinatorAgent, deps.attachmentStore!));
 
   // ── 404 + error fallback ─────────────────────────────────────────────────────
   app.notFound((c) => c.json({ error: "NotFound", message: "Not found" }, 404));
