@@ -30,6 +30,7 @@ import {
   createMockCatalogRepo,
 } from "./mock-repos.js";
 import type { AuthConfig } from "../../config/auth.config.js";
+import { InMemoryAttachmentStore } from "../../infrastructure/stores/in-memory-attachment-store.js";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -122,6 +123,7 @@ export function createTestApp(): TestContext {
     coordinatorAgent: mockAgent as unknown as AppDependencies["coordinatorAgent"],
     authConfig: testAuthConfig,
     authStrategy,
+    attachmentStore: new InMemoryAttachmentStore(),
   });
 
   return { app, repos, managers, mockAgent };

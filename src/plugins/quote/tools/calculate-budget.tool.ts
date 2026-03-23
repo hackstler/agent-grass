@@ -8,7 +8,6 @@ import type { QuoteRepository } from "../../../domain/ports/repositories/quote.r
 import type { QuoteStrategyRegistry } from "../strategies/index.js";
 import type { QuoteFooterSettings } from "../services/pdf.service.js";
 import { quoteConfig } from "../config/quote.config.js";
-import { pdfStore } from "../services/pdf-store.js";
 import { getAgentContextValue } from "../../../application/agent-context.js";
 import { logger } from "../../../shared/logger.js";
 
@@ -68,6 +67,8 @@ export function createCalculateBudgetTool({ catalogService, pdfService, attachme
           error: "Missing orgId in request context",
         };
       }
+
+      const userId = getAgentContextValue({ experimental_context }, "userId");
 
       // Fetch org data and catalog in parallel
       const [org, activeCatalog] = await Promise.all([
@@ -130,22 +131,11 @@ export function createCalculateBudgetTool({ catalogService, pdfService, attachme
         footer,
       });
 
-      // Store PDF for controller retrieval (WhatsApp delivery)
-      const pdfRequestId = getAgentContextValue({ experimental_context }, "pdfRequestId");
-      if (pdfRequestId && pdfBase64) {
-        pdfStore.set(pdfRequestId, { pdfBase64, filename });
-      }
-
-      // Store in AttachmentStore for cross-plugin retrieval (e.g. Gmail)
-      if (pdfBase64) {
-        attachmentStore.store(filename, { base64: pdfBase64, mimetype: "application/pdf", filename });
-      }
-
-      // Persist quote to DB
-      const userId = getAgentContextValue({ experimental_context }, "userId");
+      // Persist quote to DB FIRST (we need quote.id as sourceId for the attachment)
+      let quoteId: string | undefined;
       if (userId && orgId) {
         try {
-          await quoteRepo.create({
+          const quote = await quoteRepo.create({
             orgId,
             userId,
             quoteNumber,
@@ -160,9 +150,23 @@ export function createCalculateBudgetTool({ catalogService, pdfService, attachme
             quoteData: result.quoteData as Record<string, unknown>,
             ...result.extraColumns,
           });
+          quoteId = quote.id;
         } catch (err) {
           logger.error({ err }, "Failed to persist quote");
         }
+      }
+
+      // Store in AttachmentStore (persistent: memory + DB)
+      if (pdfBase64 && userId) {
+        const pdfAttachment = { base64: pdfBase64, mimetype: "application/pdf", filename };
+        await attachmentStore.store({
+          orgId,
+          userId,
+          filename,
+          attachment: pdfAttachment,
+          docType: "quote",
+          ...(quoteId ? { sourceId: quoteId } : {}),
+        });
       }
 
       // Build response (same shape as before for backward compat)

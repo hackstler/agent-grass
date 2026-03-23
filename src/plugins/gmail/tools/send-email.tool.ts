@@ -17,7 +17,8 @@ WARNING: This tool SENDS the email immediately — it does NOT ask for confirmat
 The calling agent MUST present a summary and get user confirmation BEFORE calling this tool.
 Requires the user's Google account to be connected.
 To attach a previously generated document (e.g., a PDF quote), provide its filename
-exactly as shown when it was generated (e.g., "PRES-20260306-1234.pdf").`,
+exactly as shown when it was generated (e.g., "PRES-20260306-1234.pdf").
+Use listQuotes first to find the correct filename if the user refers to an old quote.`,
     inputSchema: z.object({
       to: z
         .string()
@@ -40,22 +41,23 @@ exactly as shown when it was generated (e.g., "PRES-20260306-1234.pdf").`,
       const userId = getAgentContextValue({ experimental_context }, "userId");
       if (!userId) throw new Error('Missing userId in request context');
 
+      const orgId = getAgentContextValue({ experimental_context }, "orgId");
+      if (!orgId) throw new Error('Missing orgId in request context');
+
       let attachment: { base64: string; mimetype: string; filename: string } | undefined;
 
       if (attachmentFilename) {
-        const stored = attachmentStore.retrieve(attachmentFilename);
+        const stored = await attachmentStore.retrieve(userId, attachmentFilename);
         if (!stored) {
-          throw new Error(`Attachment "${attachmentFilename}" not found. It may have expired or was never generated. Generate the document first, then try again.`);
+          return {
+            success: false,
+            error: "ATTACHMENT_NOT_FOUND",
+            details: `Attachment "${attachmentFilename}" not found. The filename may be wrong.`,
+            suggestion: "Use listQuotes to find the correct filename, then retry with the exact filename.",
+            retryable: true,
+          };
         }
         attachment = stored;
-      } else {
-        // Fallback: if the LLM didn't pass a filename, look for the latest
-        // generated quote PDF. This makes attachment deterministic — it doesn't
-        // depend on the LLM remembering to pass the filename across turns.
-        const latestPdf = attachmentStore.findLatestByPrefix("PRES-");
-        if (latestPdf) {
-          attachment = latestPdf;
-        }
       }
 
       const result = await gmailService.sendEmail(userId, to, subject, body, attachment);

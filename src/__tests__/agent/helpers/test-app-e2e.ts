@@ -47,6 +47,7 @@ import { PdfService } from "../../../plugins/quote/services/pdf.service.js";
 import { QuoteStrategyRegistry } from "../../../plugins/quote/strategies/index.js";
 import { createCalculateBudgetTool } from "../../../plugins/quote/tools/calculate-budget.tool.js";
 import { createListCatalogTool } from "../../../plugins/quote/tools/list-catalog.tool.js";
+import { createListQuotesTool } from "../../../plugins/quote/tools/list-quotes.tool.js";
 import { createQuoteAgent } from "../../../plugins/quote/quote.agent.js";
 
 // Chat routes — production route factory
@@ -188,6 +189,7 @@ function createMockCatalogService() {
 function createMockQuoteRepo() {
   return {
     findByOrg: vi.fn().mockResolvedValue([]),
+    findByUser: vi.fn().mockResolvedValue([]),
     findById: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockImplementation(async (data: Record<string, unknown>) => ({
       id: "quote-test-001", ...data, createdAt: new Date(),
@@ -220,14 +222,15 @@ function createTestQuotePlugin(mocks: {
     catalogService: mocks.catalogService as any,
     strategy: defaultStrategy,
   });
+  const listQuotes = createListQuotesTool({ quoteRepo: mocks.quoteRepo as any });
 
-  const tools: AgentTools = { calculateBudget, listCatalog };
+  const tools: AgentTools = { calculateBudget, listCatalog, listQuotes };
   const agent = createQuoteAgent(tools, defaultStrategy);
 
   return {
     id: "quote",
     name: "Quote Plugin",
-    description: `Generates price quotes and PDF invoices for ${defaultStrategy.displayName}.`,
+    description: `Generates price quotes and PDF invoices for ${defaultStrategy.displayName}. Can also list previously generated quotes.`,
     agent,
     tools,
   };
@@ -474,6 +477,7 @@ export function createE2ETestApp(): E2ETestContext {
     authStrategy,
     quoteRepo: quoteRepo as any,
     organizationRepo: orgRepo as any,
+    attachmentStore,
   });
 
   return {

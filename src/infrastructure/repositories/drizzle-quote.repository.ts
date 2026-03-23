@@ -32,6 +32,33 @@ export class DrizzleQuoteRepository implements QuoteRepository {
       .orderBy(desc(quotes.createdAt));
   }
 
+  async findByUser(userId: string): Promise<Quote[]> {
+    return db
+      .select({
+        id: quotes.id,
+        orgId: quotes.orgId,
+        userId: quotes.userId,
+        quoteNumber: quotes.quoteNumber,
+        clientName: quotes.clientName,
+        clientAddress: quotes.clientAddress,
+        lineItems: quotes.lineItems,
+        subtotal: quotes.subtotal,
+        vatAmount: quotes.vatAmount,
+        total: quotes.total,
+        pdfBase64: quotes.pdfBase64,
+        filename: quotes.filename,
+        quoteData: quotes.quoteData,
+        surfaceType: quotes.surfaceType,
+        areaM2: quotes.areaM2,
+        perimeterLm: quotes.perimeterLm,
+        province: quotes.province,
+        createdAt: quotes.createdAt,
+      })
+      .from(quotes)
+      .where(eq(quotes.userId, userId))
+      .orderBy(desc(quotes.createdAt));
+  }
+
   async findById(id: string, orgId: string): Promise<Quote | null> {
     const result = await db.query.quotes.findFirst({
       where: and(eq(quotes.id, id), eq(quotes.orgId, orgId)),

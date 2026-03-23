@@ -174,7 +174,9 @@ src/
 ### Testing
 - Unit tests: mockear repos con `mock-repos.ts`, testear managers
 - Integration tests: usar `test-app.ts` para crear app con mocks, testear controllers
-- Nombrar: `*.test.ts` en `__tests__/unit/` o `__tests__/integration/`
+- **E2E tests** (`src/__tests__/agent/`): agentes Gemini REALES, tools reales, PDFs reales. Requieren `GOOGLE_API_KEY`.
+- **OBLIGATORIO**: Tras cualquier cambio en tools, plugins, controllers, coordinator o delegation, ejecutar `npm run test:e2e`. Son los tests más importantes del proyecto.
+- Nombrar: `*.test.ts` en `__tests__/unit/`, `__tests__/integration/` o `__tests__/agent/`
 
 ## Comandos npm
 ```bash
@@ -191,6 +193,8 @@ npm run lint              # ESLint
 npm run test              # Vitest (todos)
 npm run test:unit         # Solo unit tests
 npm run test:integration  # Solo integration tests
+npm run test:e2e          # E2E con agentes Gemini reales (OBLIGATORIO tras cambios en agents/tools)
+npm run test:all          # Unit + integration + E2E
 docker-compose up         # Stack local (postgres + app)
 ```
 

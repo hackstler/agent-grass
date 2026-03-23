@@ -134,6 +134,13 @@
       "when": 1774018017464,
       "tag": "0018_add-phone-to-users",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1774299406660,
+      "tag": "0019_add-attachments-table",
+      "breakpoints": true
     }
   ]
 }

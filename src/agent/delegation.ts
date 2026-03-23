@@ -29,10 +29,8 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager) 
         const conversationId = getAgentContextValue({ experimental_context }, "conversationId");
         const orgId = getAgentContextValue({ experimental_context }, "orgId");
         const userId = getAgentContextValue({ experimental_context }, "userId");
-        const pdfRequestId = getAgentContextValue({ experimental_context }, "pdfRequestId");
-
         const ctx = conversationId && orgId
-          ? { userId: userId ?? "anonymous", orgId, conversationId, ...(pdfRequestId && { pdfRequestId }) }
+          ? { userId: userId ?? "anonymous", orgId, conversationId }
           : undefined;
 
         // Load conversation history so the sub-agent has cross-turn context

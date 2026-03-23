@@ -93,6 +93,7 @@ CRITICAL: Once you have confirmed an action to the user (e.g., "He enviado el co
 
 Some tasks require chaining agents, but ONLY when the user asks for multiple actions in a SINGLE message:
 - "Hazme un presupuesto y envíalo por email" → first delegateTo_quote, then delegateTo_gmail with the PDF filename.
+- "Envía el presupuesto de Juan" → first delegateTo_quote to listQuotes({ clientName: "Juan" }), get the filename, then delegateTo_gmail with the filename.
 - "Consulta el precio del X y hazme un presupuesto" → first delegateTo_catalog-manager, then delegateTo_quote.
 Execute steps sequentially, passing context from each result to the next delegation.
 NEVER chain agents across separate messages. Each new message from the user = fresh intent analysis.

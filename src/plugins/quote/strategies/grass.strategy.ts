@@ -80,6 +80,11 @@ Opcionales:
 - El PDF se genera automáticamente.
 - Presenta un resumen al vendedor con los rangos de precio (del más económico al premium).
 
+== PRESUPUESTOS ANTERIORES ==
+- Si el vendedor quiere enviar o consultar un presupuesto anterior, usa listQuotes para buscar por nombre de cliente.
+- listQuotes devuelve el filename exacto que se puede pasar a sendEmail.
+- Ejemplo: "envía el presupuesto de Juan" → listQuotes({ clientName: "Juan" }) → obtén el filename → pásalo al agente de email.
+
 Responde SIEMPRE en ${lang}.`;
   }
 

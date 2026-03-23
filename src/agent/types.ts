@@ -7,7 +7,6 @@ export interface AgentContext {
   userId: string;
   orgId: string;
   conversationId: string;
-  pdfRequestId?: string;
 }
 
 /**

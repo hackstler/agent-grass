@@ -320,6 +320,26 @@ export const quotes = pgTable("quotes", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ── Attachments (persistent, cross-plugin file storage) ──────────────────────
+export const attachments = pgTable(
+  "attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: text("org_id").notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    mimetype: text("mimetype").notNull(),
+    base64: text("base64").notNull(),
+    docType: text("doc_type").notNull(), // "quote" | "invoice" | ...
+    sourceId: text("source_id"), // back-ref to quote.id, etc.
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    userFilenameUq: uniqueIndex("attachments_user_filename_uq").on(table.userId, table.filename),
+    userDocTypeIdx: index("attachments_user_doc_type_idx").on(table.userId, table.docType),
+  })
+);
+
 // ── Grass pricing lookup table (price/m² by grass type × surface × m²) ───────
 export const grassPricing = pgTable(
   "grass_pricing",
@@ -488,3 +508,5 @@ export type QuoteRow = typeof quotes.$inferSelect;
 export type NewQuoteRow = typeof quotes.$inferInsert;
 export type GrassPricingRow = typeof grassPricing.$inferSelect;
 export type NewGrassPricingRow = typeof grassPricing.$inferInsert;
+export type AttachmentRow = typeof attachments.$inferSelect;
+export type NewAttachmentRow = typeof attachments.$inferInsert;

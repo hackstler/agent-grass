@@ -1,18 +1,16 @@
-import type { AttachmentStore, StoredAttachment } from "../../domain/ports/attachment-store.js";
+import type { AttachmentStore, StoredAttachment, AttachmentMetadata } from "../../domain/ports/attachment-store.js";
 import { logger } from "../../shared/logger.js";
 
 interface CacheEntry {
   attachment: StoredAttachment;
+  docType: string;
+  sourceId: string | null;
   timestamp: number;
 }
 
 /**
- * In-memory implementation of AttachmentStore with TTL-based cleanup.
- *
- * Stores documents (PDFs, etc.) keyed by filename so they can be retrieved
- * across different requests within the TTL window.
- *
- * Singleton instance shared between plugins — created once in composition root.
+ * In-memory implementation of AttachmentStore (for tests).
+ * Scoped by userId — same interface as PersistentAttachmentStore but without DB.
  */
 export class InMemoryAttachmentStore implements AttachmentStore {
   private readonly cache = new Map<string, CacheEntry>();
@@ -22,36 +20,51 @@ export class InMemoryAttachmentStore implements AttachmentStore {
     this.maxAgeMs = maxAgeMs;
   }
 
-  store(filename: string, attachment: StoredAttachment): void {
+  async store(params: {
+    orgId: string;
+    userId: string;
+    filename: string;
+    attachment: StoredAttachment;
+    docType: string;
+    sourceId?: string;
+  }): Promise<void> {
     this.cleanup();
-    this.cache.set(filename, { attachment, timestamp: Date.now() });
-    logger.info({ filename, sizeKB: Math.round(attachment.base64.length / 1024), storeSize: this.cache.size }, "attachment stored");
+    const key = `${params.userId}:${params.filename}`;
+    this.cache.set(key, {
+      attachment: params.attachment,
+      docType: params.docType,
+      sourceId: params.sourceId ?? null,
+      timestamp: Date.now(),
+    });
+    logger.info({ filename: params.filename, sizeKB: Math.round(params.attachment.base64.length / 1024), storeSize: this.cache.size }, "attachment stored (in-memory)");
   }
 
-  retrieve(filename: string): StoredAttachment | null {
+  async retrieve(userId: string, filename: string): Promise<StoredAttachment | null> {
     this.cleanup();
-    const entry = this.cache.get(filename);
+    const key = `${userId}:${filename}`;
+    const entry = this.cache.get(key);
     if (!entry) {
-      const keys = [...this.cache.keys()];
-      logger.info({ filename, storeSize: this.cache.size, keys }, "attachment miss");
+      logger.info({ filename, userId, storeSize: this.cache.size }, "attachment miss (in-memory)");
       return null;
     }
-    logger.info({ filename }, "attachment hit");
+    logger.info({ filename, userId }, "attachment hit (in-memory)");
     return entry.attachment;
   }
 
-  findLatestByPrefix(prefix: string): StoredAttachment | null {
+  async list(userId: string, docType?: string): Promise<AttachmentMetadata[]> {
     this.cleanup();
-    let latest: CacheEntry | null = null;
+    const results: AttachmentMetadata[] = [];
     for (const [key, entry] of this.cache) {
-      if (key.startsWith(prefix) && (!latest || entry.timestamp > latest.timestamp)) {
-        latest = entry;
-      }
+      if (!key.startsWith(`${userId}:`)) continue;
+      if (docType && entry.docType !== docType) continue;
+      results.push({
+        filename: entry.attachment.filename,
+        docType: entry.docType,
+        sourceId: entry.sourceId,
+        createdAt: new Date(entry.timestamp),
+      });
     }
-    if (latest) {
-      logger.info({ prefix, matchedFilename: latest.attachment.filename }, "attachment prefix match");
-    }
-    return latest?.attachment ?? null;
+    return results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   private cleanup(): void {
