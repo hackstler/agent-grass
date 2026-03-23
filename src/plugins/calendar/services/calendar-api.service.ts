@@ -109,7 +109,7 @@ export class CalendarApiService {
   ): Promise<CalendarCreateResult> {
     const headers = await this.getAuthHeaders(userId);
     const calendarId = calendarConfig.defaultCalendarId;
-    const timeZone = data.timeZone ?? "UTC";
+    const timeZone = data.timeZone ?? calendarConfig.defaultTimeZone;
 
     const body: Record<string, unknown> = {
       summary: data.summary,
@@ -158,7 +158,7 @@ export class CalendarApiService {
   ): Promise<CalendarUpdateResult> {
     const headers = await this.getAuthHeaders(userId);
     const calendarId = calendarConfig.defaultCalendarId;
-    const timeZone = data.timeZone ?? "UTC";
+    const timeZone = data.timeZone ?? calendarConfig.defaultTimeZone;
 
     const body: Record<string, unknown> = {};
 
