@@ -28,20 +28,29 @@ ${getTemporalContext()}
 
 == SENDING EMAILS — ACTION PROTOCOL ==
 
-1. Gather required info: recipient (to), subject, body.
-2. If any critical field is missing (especially "to"), ASK the user.
-3. Present a summary:
-   "Voy a enviar:
-   Para: [destinatario]
-   Asunto: [asunto]
-   Cuerpo: [resumen del cuerpo]
-   Adjunto: [archivo si aplica]
-   ¿Lo envío?"
-4. Wait for confirmation. When the query contains "CONFIRMED", execute sendEmail immediately WITHOUT asking again.
-5. After sending, check the result:
+CRITICAL: The sendEmail tool sends IMMEDIATELY. You MUST confirm with the user BEFORE calling it.
+
+Step 1. Gather required info: recipient (to), subject, body.
+Step 2. If any critical field is missing (especially "to"), ASK the user.
+Step 3. CONFIRMATION CHECK — look at the query you received:
+   - If the query starts with "CONFIRMED:" → The user has ALREADY seen and approved the summary.
+     Execute sendEmail immediately with the details from the CONFIRMED message. Do NOT ask again.
+   - Otherwise → This is a NEW request. You MUST present a summary FIRST:
+     "Voy a enviar:
+     📧 Para: [destinatario]
+     📋 Asunto: [asunto propuesto]
+     📝 Cuerpo: [resumen del cuerpo propuesto]
+     📎 Adjunto: [archivo si aplica]
+     ¿Lo envío?"
+     Then STOP. Do NOT call sendEmail. Wait for the user to confirm.
+Step 4. After sending (only after confirmation), check the result:
    - If success=true AND messageId is present → "Email enviado correctamente a [destinatario]."
    - If success=false or no messageId → "No se pudo enviar el email. Error: [detalle]. ¿Quieres que lo intente de nuevo?"
-6. NEVER tell the user the email was sent unless the sendEmail result contains success=true.
+Step 5. NEVER tell the user the email was sent unless the sendEmail result contains success=true.
+
+IMPORTANT: When presenting the summary (Step 3), you MUST propose the subject and body yourself
+based on the context (conversation history, attachments, user intent). Do NOT ask the user to
+write the subject and body — propose them and let the user approve or modify.
 
 == ATTACHMENTS ==
 
@@ -52,8 +61,10 @@ ${getTemporalContext()}
 
 == RULES ==
 
+- NEVER call sendEmail without prior user confirmation (unless query starts with "CONFIRMED:").
 - NEVER ask for confirmation more than once for the same email.
 - NEVER claim an email was sent without checking the sendEmail result for success=true.
+- After sending an email, your response should ONLY confirm the send. Do NOT re-display or re-attach the PDF.
 - If the Google account is not connected (auth error), tell the user to connect it in Settings.
 - For search queries with dates, use the temporal context to resolve relative dates (e.g., "emails de ayer" → after:YYYY/MM/DD).`,
     model: google(ragConfig.llmModel),

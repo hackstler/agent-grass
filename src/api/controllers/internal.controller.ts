@@ -174,15 +174,26 @@ export function createInternalController(
       const waText = formatForWhatsApp(replyText) + buildSourcesFooter(sources);
 
       // PDF retrieval: keyed by pdfRequestId (UUID) via experimental_context.
+      // Only attach PDF to WhatsApp when the user's request was about GENERATING a quote,
+      // not when they asked to send it by email (gmail handles the attachment itself).
       let document: DocumentAttachment | null = null;
-      const storeEntry = pdfStore.take(pdfRequestId);
-      if (storeEntry) {
-        document = {
-          base64: storeEntry.pdfBase64,
-          mimetype: "application/pdf",
-          filename: storeEntry.filename,
-        };
-        logger.info({ filename: document.filename }, "PDF attached to reply");
+      const delegatedToGmail = result.steps.some((s) =>
+        s.toolResults.some((r) => r.toolName === "delegateTo_gmail"),
+      );
+      if (!delegatedToGmail) {
+        const storeEntry = pdfStore.take(pdfRequestId);
+        if (storeEntry) {
+          document = {
+            base64: storeEntry.pdfBase64,
+            mimetype: "application/pdf",
+            filename: storeEntry.filename,
+          };
+          logger.info({ filename: document.filename }, "PDF attached to WhatsApp reply");
+        }
+      } else {
+        // Clean up any PDF that was generated in this turn (e.g. coordinator re-delegated to quote)
+        pdfStore.take(pdfRequestId);
+        logger.info("Skipping PDF attachment — email flow handled attachment via Gmail");
       }
 
       return c.json({

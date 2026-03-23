@@ -115,6 +115,7 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
     return stream(c, async (streamWriter) => {
       let fullAnswer = "";
       let sourcesEmitted = false;
+      let attachmentEmitted = false;
       const collectedSources: Array<{ id: string; documentTitle: string; documentSource: string; score: number; excerpt: string }> = [];
       const collectedToolSummaries: ToolCallSummary[] = [];
 
@@ -223,14 +224,18 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
                 sourcesEmitted = true;
               }
 
-              // Extract PDF attachments (may be nested inside sub-agent delegation)
-              if (attachmentStore) {
-                const filename = findPdfFilename(result);
-                // findPdfFilename searches recursively for { pdfGenerated: true, filename }
-                if (filename) {
-                  const stored = attachmentStore.retrieve(filename);
-                  if (stored) {
-                    await emit({ type: "attachment", filename: stored.filename, base64: stored.base64 });
+              // Extract PDF attachments ONLY from quote-related tools (not from gmail/calendar/etc.)
+              // This prevents re-sending a PDF when the gmail agent sends it as an attachment.
+              if (attachmentStore && !attachmentEmitted) {
+                const isQuoteTool = toolName === "calculateBudget" || toolName === "delegateTo_quote";
+                if (isQuoteTool) {
+                  const filename = findPdfFilename(result);
+                  if (filename) {
+                    const stored = attachmentStore.retrieve(filename);
+                    if (stored) {
+                      await emit({ type: "attachment", filename: stored.filename, base64: stored.base64 });
+                      attachmentEmitted = true;
+                    }
                   }
                 }
               }

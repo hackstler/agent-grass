@@ -13,7 +13,8 @@ export function createSendEmailTool({ gmailService, attachmentStore }: SendEmail
   return tool({
     description:
       `Send an email via the user's Gmail account, optionally with a file attachment.
-Confirm details with the user before sending unless the query contains CONFIRMED.
+WARNING: This tool SENDS the email immediately — it does NOT ask for confirmation.
+The calling agent MUST present a summary and get user confirmation BEFORE calling this tool.
 Requires the user's Google account to be connected.
 To attach a previously generated document (e.g., a PDF quote), provide its filename
 exactly as shown when it was generated (e.g., "PRES-20260306-1234.pdf").`,
