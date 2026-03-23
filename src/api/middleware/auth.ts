@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 const { sign, verify } = jwt;
 import type { JwtPayload } from "jsonwebtoken";
 import { hasPermission, type Permission, type Role } from "../../domain/permissions.js";
+import { logger } from "../../shared/logger.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ export function authMiddleware(): MiddlewareHandler {
   const jwtSecret = process.env["JWT_SECRET"];
 
   if (!apiKey && !jwtSecret) {
-    console.warn("[auth] Neither API_KEY nor JWT_SECRET set — authentication disabled");
+    logger.warn("Neither API_KEY nor JWT_SECRET set — authentication disabled");
     return async (_c, next) => next();
   }
 

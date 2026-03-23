@@ -1,3 +1,4 @@
+import { logger } from "../../../shared/logger.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db } from "../../../infrastructure/db/client.js";
 import { topics } from "../../../infrastructure/db/schema.js";
@@ -59,7 +60,7 @@ ${truncated}`;
       language: parsed.language ?? "es",
     };
   } catch {
-    console.warn("[enricher] Failed to parse LLM response, using defaults");
+    logger.warn("Failed to parse LLM enrichment response, using defaults");
     return {
       summary: "",
       keywords: [],

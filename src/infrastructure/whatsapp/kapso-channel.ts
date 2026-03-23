@@ -1,4 +1,5 @@
 import type { WhatsAppChannel } from "../../domain/ports/whatsapp-channel.js";
+import { logger } from "../../shared/logger.js";
 
 const KAPSO_BASE = "https://api.kapso.ai/meta/whatsapp/v24.0";
 
@@ -30,7 +31,7 @@ export class KapsoChannel implements WhatsAppChannel {
 
     if (!res.ok) {
       const err = await res.text().catch(() => "");
-      console.error("[kapso] sendText failed:", res.status, err);
+      logger.error({ statusCode: res.status, responseBody: err }, "sendText failed");
     }
   }
 
@@ -53,7 +54,7 @@ export class KapsoChannel implements WhatsAppChannel {
 
     if (!uploadRes.ok) {
       const err = await uploadRes.text().catch(() => "");
-      console.error("[kapso] media upload failed:", uploadRes.status, err);
+      logger.error({ statusCode: uploadRes.status, responseBody: err }, "media upload failed");
       return;
     }
 
@@ -77,7 +78,7 @@ export class KapsoChannel implements WhatsAppChannel {
 
     if (!res.ok) {
       const err = await res.text().catch(() => "");
-      console.error("[kapso] sendDocument failed:", res.status, err);
+      logger.error({ statusCode: res.status, responseBody: err }, "sendDocument failed");
     }
   }
 }

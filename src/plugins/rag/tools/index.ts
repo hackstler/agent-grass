@@ -1,3 +1,4 @@
+import { logger } from "../../../shared/logger.js";
 import { toolsConfig } from "../config/tools.config.js";
 import { searchDocumentsEntry } from "./search-documents.js";
 import { searchWebEntry } from "./search-web.js";
@@ -31,10 +32,7 @@ export function createToolRegistry(deps: ToolRegistryDeps) {
 
   const activeTools = ALL_TOOLS.filter((t) => enabled.has(t.key));
 
-  console.log(
-    "[tools] active:",
-    activeTools.map((t) => t.key).join(", ") || "none"
-  );
+  logger.info({ tools: activeTools.map((t) => t.key) }, "Active tools registered");
 
   return Object.fromEntries(activeTools.map((t) => [t.key, t.create(deps)]));
 }

@@ -1,3 +1,4 @@
+import { logger } from "../../../shared/logger.js";
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { z } from "zod";
@@ -133,7 +134,7 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
         try {
           await convManager.persistUserMessage(conversationId, parsed.data.query);
         } catch (err) {
-          console.error("[chat/stream] failed to persist user message:", err instanceof Error ? err.message : err);
+          logger.error({ err }, "Failed to persist user message");
         }
 
         const agentStream = await agent.stream({
@@ -268,7 +269,7 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
             // ── Error from LLM ─────────────────────────────────
             case "error": {
               const error = chunk;
-              console.error("[chat/stream] error chunk from agent:", JSON.stringify(error, null, 2));
+              logger.error({ err: error }, "Error chunk from agent");
               await emit({ type: "error", message: String((error as Record<string, unknown>)?.["message"] ?? error) });
               break;
             }
@@ -281,7 +282,7 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
                 "tool-input-start", "tool-input-delta",
               ]);
               if (!ignoredTypes.has(chunk.type)) {
-                console.debug(`[chat/stream] unhandled chunk type: ${chunk.type}`);
+                logger.debug({ chunkType: chunk.type }, "Unhandled chunk type in chat stream");
               }
               break;
             }
@@ -301,7 +302,7 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
               toolCalls: collectedToolSummaries,
             });
           } catch (err) {
-            console.error("[chat/stream] failed to persist assistant message:", err instanceof Error ? err.message : err);
+            logger.error({ err }, "Failed to persist assistant message");
           }
         }
       } catch (error) {

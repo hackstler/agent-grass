@@ -10,6 +10,7 @@ import type { QuoteFooterSettings } from "../services/pdf.service.js";
 import { quoteConfig } from "../config/quote.config.js";
 import { pdfStore } from "../services/pdf-store.js";
 import { getAgentContextValue } from "../../../application/agent-context.js";
+import { logger } from "../../../shared/logger.js";
 
 export interface CalculateBudgetDeps {
   catalogService: CatalogService;
@@ -160,7 +161,7 @@ export function createCalculateBudgetTool({ catalogService, pdfService, attachme
             ...result.extraColumns,
           });
         } catch (err) {
-          console.error("[quote] failed to persist quote:", err instanceof Error ? err.message : err);
+          logger.error({ err }, "Failed to persist quote");
         }
       }
 

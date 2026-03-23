@@ -1,5 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { DomainError } from "../../domain/errors/index.js";
+import { logger } from "../../shared/logger.js";
 
 const ERROR_STATUS_MAP: Record<string, number> = {
   NotFoundError: 404,
@@ -39,7 +40,7 @@ export function errorHandler(): MiddlewareHandler {
           | 409;
         return c.json({ error: errorCategory(error), message: error.message }, status);
       }
-      console.error("[error-handler] Unexpected error:", error);
+      logger.error({ err: error }, "Unexpected error");
       return c.json({ error: "InternalError", message: "Internal server error" }, 500);
     }
   };

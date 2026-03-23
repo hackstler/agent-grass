@@ -1,3 +1,4 @@
+import { logger } from "../../../../shared/logger.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { LoadedDocument, LoadOptions } from "../loader.js";
 
@@ -37,31 +38,31 @@ interface YoutubeApiVideo {
 async function fetchVideoMetadata(videoId: string, apiKey: string | undefined): Promise<YoutubeApiVideo> {
   // Primary: YouTube Data API v3 (requires API key with YouTube Data API v3 enabled)
   if (apiKey) {
-    console.log(`  [youtube:meta] Using YouTube Data API v3 for ${videoId}`);
+    logger.info({ videoId }, "Using YouTube Data API v3 for metadata");
     const url =
       `https://www.googleapis.com/youtube/v3/videos` +
       `?part=snippet,contentDetails&id=${videoId}&key=${apiKey}`;
 
     const response = await fetch(url);
-    console.log(`  [youtube:meta] API response: HTTP ${response.status}`);
+    logger.info({ status: response.status }, "YouTube Data API response");
 
     if (response.ok) {
       const data = await response.json() as { items?: YoutubeApiVideo[] };
       if (data.items?.length) {
         const item = data.items[0]!;
-        console.log(`  [youtube:meta] API OK — title="${item.snippet.title}" channel="${item.snippet.channelTitle}" duration="${item.contentDetails.duration}" descLen=${item.snippet.description.length}chars`);
+        logger.info({ title: item.snippet.title, channel: item.snippet.channelTitle, duration: item.contentDetails.duration, descriptionLength: item.snippet.description.length }, "YouTube metadata fetched via API");
         return item;
       }
-      console.warn(`  [youtube:meta] API returned 0 items, falling back to scraping`);
+      logger.warn("YouTube API returned 0 items, falling back to scraping");
     }
     // Non-fatal: fall through to HTML scraping
     if (response.status !== 403 && response.status !== 400) {
-      console.warn(`  [youtube:meta] API returned ${response.status}, falling back to HTML scraping`);
+      logger.warn({ status: response.status }, "YouTube API error, falling back to HTML scraping");
     } else {
-      console.warn(`  [youtube:meta] API key rejected (${response.status}), falling back to HTML scraping`);
+      logger.warn({ status: response.status }, "YouTube API key rejected, falling back to HTML scraping");
     }
   } else {
-    console.log(`  [youtube:meta] No API key — using HTML scraping for ${videoId}`);
+    logger.info({ videoId }, "No YouTube API key, using HTML scraping");
   }
 
   // Fallback: scrape OG tags from YouTube page (no API key needed)
@@ -71,7 +72,7 @@ async function fetchVideoMetadata(videoId: string, apiKey: string | undefined): 
 async function scrapeYoutubeMetadata(videoId: string): Promise<YoutubeApiVideo> {
   const { load } = await import("cheerio");
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  console.log(`  [youtube:scrape] Fetching ${url}`);
+  logger.info({ url }, "Scraping YouTube page for metadata");
 
   const response = await fetch(url, {
     headers: {
@@ -117,7 +118,7 @@ async function scrapeYoutubeMetadata(videoId: string): Promise<YoutubeApiVideo> 
     tags = keywordsMatch[1].split(",").map((t) => t.trim()).filter(Boolean);
   }
 
-  console.log(`  [youtube:scrape] OK — title="${title}" channel="${channelTitle || "Unknown"}" descLen=${description.length}chars thumbnail=${thumbnail ? "found" : "MISSING"}`);
+  logger.info({ title, channel: channelTitle || "Unknown", descriptionLength: description.length, hasThumbnail: !!thumbnail }, "YouTube page scraped successfully");
   return {
     snippet: {
       title,
@@ -151,15 +152,15 @@ function formatDuration(iso: string): string {
 interface TranscriptSegment { text: string; offset: number; duration: number; }
 
 async function fetchTranscript(videoId: string): Promise<TranscriptSegment[] | null> {
-  console.log(`  [youtube:transcript] Attempting to fetch transcript for ${videoId}`);
+  logger.info({ videoId }, "Fetching transcript");
   try {
     const { YoutubeTranscript } = await import("youtube-transcript");
     const items = await YoutubeTranscript.fetchTranscript(videoId) as TranscriptSegment[];
-    console.log(`  [youtube:transcript] OK — ${items.length} segments`);
+    logger.info({ segmentCount: items.length }, "Transcript fetched successfully");
     return items;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn(`  [youtube:transcript] NONE — ${message}`);
+    logger.warn({ err }, "No transcript available");
     return null;
   }
 }
@@ -206,7 +207,7 @@ async function fetchImagePart(url: string): Promise<ImagePart | null> {
   try {
     const res = await fetch(url);
     if (!res.ok) {
-      console.log(`  [youtube:image] SKIP ${url} → HTTP ${res.status}`);
+      logger.info({ url, status: res.status }, "Skipping image fetch");
       return null;
     }
     const buffer = Buffer.from(await res.arrayBuffer());
@@ -215,11 +216,10 @@ async function fetchImagePart(url: string): Promise<ImagePart | null> {
       | "image/jpeg"
       | "image/png"
       | "image/webp";
-    console.log(`  [youtube:image] OK   ${url} → ${(buffer.length / 1024).toFixed(1)} KB (${mimeType})`);
+    logger.info({ url, sizeKB: +(buffer.length / 1024).toFixed(1), mimeType }, "Image fetched successfully");
     return { inlineData: { mimeType, data: buffer.toString("base64") } };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.log(`  [youtube:image] FAIL ${url} → ${message}`);
+    logger.warn({ url, err }, "Failed to fetch image");
     return null;
   }
 }
@@ -249,11 +249,11 @@ async function generateVisualDescription(
     const imageParts = [mainPart, ...autoParts].filter((p): p is ImagePart => p !== null);
 
     if (imageParts.length === 0) {
-      console.warn(`  [youtube:vision] No images available for ${videoId}`);
+      logger.warn({ videoId }, "No images available for vision analysis");
       return null;
     }
 
-    console.log(`  [youtube:vision] Calling Gemini with ${imageParts.length} image(s) for "${title}"`);
+    logger.info({ imageCount: imageParts.length, title }, "Calling Gemini Vision for thumbnail analysis");
 
     const genai = new GoogleGenerativeAI(googleApiKey);
     const model = genai.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -268,16 +268,15 @@ async function generateVisualDescription(
          `personas, objetos, acciones, texto visible en la imagen. ` +
          `Sé específico y útil para alguien que quiere entender de qué trata este video.`;
     const prompt = rawPrompt.replace(/\{title\}/g, title);
-    console.log(`  [youtube:vision] Prompt source: ${promptSource} (${prompt.length} chars)`);
+    logger.debug({ promptSource, promptLength: prompt.length }, "Vision AI prompt configured");
 
     const result = await model.generateContent([...imageParts, prompt]);
 
     const text = result.response.text().trim();
-    console.log(`  [youtube:vision] Gemini response: ${text.length} chars`);
+    logger.info({ responseLength: text.length }, "Gemini Vision response received");
     return text || null;
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.warn(`  [youtube] Vision AI failed for ${videoId}: ${message}`);
+    logger.warn({ videoId, err }, "Vision AI failed");
     return null;
   }
 }
@@ -292,8 +291,7 @@ export async function loadYoutubeVideo(url: string, options?: LoadOptions): Prom
 
   const videoId = extractVideoId(url);
   const canonicalUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  console.log(`\n[youtube] Loading ${canonicalUrl}`);
-  console.log(`  [youtube] youtubeApiKey=${youtubeApiKey ? "SET" : "NOT SET"} googleApiKey=${googleApiKey ? "SET" : "NOT SET"}`);
+  logger.info({ url: canonicalUrl, hasYoutubeApiKey: !!youtubeApiKey, hasGoogleApiKey: !!googleApiKey }, "Loading YouTube video");
 
   const [video, transcriptSegments] = await Promise.all([
     fetchVideoMetadata(videoId, youtubeApiKey),
@@ -306,23 +304,23 @@ export async function loadYoutubeVideo(url: string, options?: LoadOptions): Prom
   const thumbnail =
     snippet.thumbnails.high?.url ?? snippet.thumbnails.default?.url ?? "";
 
-  console.log(`  [youtube] transcript=${transcriptSegments ? `${transcriptSegments.length} segments` : "NONE"} thumbnail=${thumbnail || "MISSING"}`);
+  logger.info({ transcriptSegments: transcriptSegments?.length ?? 0, hasTranscript: !!transcriptSegments, hasThumbnail: !!thumbnail }, "YouTube data fetched");
 
   // Content section 3: transcript (with timestamps) OR Vision AI analysis
   let contentSection: string | null = null;
   let isVisualAnalysis = false;
 
   if (transcriptSegments && transcriptSegments.length > 0) {
-    console.log(`  [youtube] Transcript available — building timestamped sections`);
+    logger.info("Transcript available, building timestamped sections");
     contentSection = groupTranscriptBySections(transcriptSegments, 120); // 2-min sections
   } else if (thumbnail && googleApiKey) {
-    console.log(`  [youtube] No transcript → attempting Vision AI`);
+    logger.info("No transcript, attempting Vision AI analysis");
     contentSection = await generateVisualDescription(videoId, snippet.title, thumbnail, googleApiKey, options?.visionPrompt);
     if (contentSection) isVisualAnalysis = true;
   } else if (!thumbnail) {
-    console.warn(`  [youtube] No transcript AND no thumbnail — storing metadata only`);
+    logger.warn("No transcript and no thumbnail, storing metadata only");
   } else if (!googleApiKey) {
-    console.warn(`  [youtube] No transcript AND no GOOGLE_API_KEY — skipping Vision AI`);
+    logger.warn("No transcript and no GOOGLE_API_KEY, skipping Vision AI");
   }
 
   // ── Structured content with ## headers so hierarchical chunker splits naturally ──
@@ -356,7 +354,7 @@ export async function loadYoutubeVideo(url: string, options?: LoadOptions): Prom
 
   const content = parts.join("\n\n");
 
-  console.log(`  [youtube] Content built: ${parts.length} sections, ${content.length} chars, isVisualAnalysis=${isVisualAnalysis}`);
+  logger.info({ sectionCount: parts.length, contentLength: content.length, isVisualAnalysis }, "YouTube content built");
 
   return {
     content,

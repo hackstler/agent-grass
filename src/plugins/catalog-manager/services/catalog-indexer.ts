@@ -8,6 +8,7 @@ import { db } from "../../../infrastructure/db/client.js";
 import { documents, grassPricing, catalogItems as catalogItemsTable } from "../../../infrastructure/db/schema.js";
 import { eq, and, sql } from "drizzle-orm";
 import type { EntityIndexer } from "./entity-indexer.js";
+import { logger } from "../../../shared/logger.js";
 
 interface PriceRange {
   min: number;
@@ -143,7 +144,7 @@ export class CatalogIndexer implements EntityIndexer<CatalogWithItems> {
   async index(orgId: string, catalogId: string): Promise<ProcessResult | null> {
     const catalog = await this.catalogRepo.findByOrgAndId(orgId, catalogId);
     if (!catalog) {
-      console.warn(`[catalog-indexer] catalog ${catalogId} not found for org ${orgId}`);
+      logger.warn({ catalogId, orgId }, "Catalog not found for org");
       return null;
     }
 
@@ -168,7 +169,7 @@ export class CatalogIndexer implements EntityIndexer<CatalogWithItems> {
     if (existing) {
       const existingHash = (existing.metadata as Record<string, unknown> | null)?.["contentHash"];
       if (existingHash === hash) {
-        console.log(`[catalog-indexer] skipping "${catalog.name}" — content unchanged`);
+        logger.info({ catalogName: catalog.name }, "Skipping catalog — content unchanged");
         return { documentId: existing.id, chunkCount: 0, status: "indexed", skipped: true };
       }
     }
@@ -176,7 +177,7 @@ export class CatalogIndexer implements EntityIndexer<CatalogWithItems> {
     // Store hash in metadata for future comparisons
     loaded.metadata = { ...loaded.metadata, contentHash: hash } as typeof loaded.metadata;
 
-    console.log(`[catalog-indexer] indexing catalog "${catalog.name}" (${items.length} items, hash=${hash})`);
+    logger.info({ catalogName: catalog.name, itemCount: items.length, hash }, "Indexing catalog");
     return processDocument(loaded, orgId);
   }
 
@@ -188,7 +189,7 @@ export class CatalogIndexer implements EntityIndexer<CatalogWithItems> {
     });
     if (existing) {
       await db.delete(documents).where(eq(documents.id, existing.id));
-      console.log(`[catalog-indexer] removed index for catalog ${catalogId}`);
+      logger.info({ catalogId }, "Removed catalog index");
     }
   }
 
@@ -204,7 +205,7 @@ export class CatalogIndexer implements EntityIndexer<CatalogWithItems> {
         if (result?.status === "indexed") indexed++;
         else if (result?.status === "failed") failed++;
       } catch (err) {
-        console.error(`[catalog-indexer] failed to index catalog ${catalog.id}:`, err);
+        logger.error({ err, catalogId: catalog.id }, "Failed to index catalog");
         failed++;
       }
     }

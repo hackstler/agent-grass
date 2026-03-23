@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { serve } from "@hono/node-server";
 import { ensurePgVector, runMigrations } from "./infrastructure/db/client.js";
+import { logger } from "./shared/logger.js";
 
 // Infrastructure — repositories
 import { DrizzleUserRepository } from "./infrastructure/repositories/drizzle-user.repository.js";
@@ -133,7 +134,7 @@ const app = createApp({
 const PORT = Number(process.env["PORT"] ?? 3000);
 
 async function main() {
-  console.log(`[startup] booting rag-agent-backbone (port=${PORT}, node=${process.version})`);
+  logger.info({ port: PORT, node: process.version }, "Booting rag-agent-backbone");
 
   const googleKey = process.env["GOOGLE_API_KEY"] ?? process.env["GOOGLE_GENERATIVE_AI_API_KEY"];
   if (!googleKey) {
@@ -142,12 +143,12 @@ async function main() {
     );
   }
 
-  console.log("[startup] connecting to database...");
+  logger.info("Connecting to database...");
   await ensurePgVector();
-  console.log("[startup] pgvector extension ready");
+  logger.info("pgvector extension ready");
 
   await runMigrations();
-  console.log("[startup] migrations applied");
+  logger.info("Migrations applied");
 
   await pluginRegistry.ensureTablesForAll();
 
@@ -156,8 +157,7 @@ async function main() {
   await pluginRegistry.initializeAll();
 
   serve({ fetch: app.fetch, port: PORT }, () => {
-    console.log(`[startup] rag-agent-backbone running on http://localhost:${PORT}`);
-    console.log(`[startup] Environment: ${process.env["NODE_ENV"] ?? "development"}`);
+    logger.info({ port: PORT, env: process.env["NODE_ENV"] ?? "development" }, "Server running");
   });
 }
 
@@ -171,18 +171,18 @@ async function seedAdminUser() {
     const email = process.env["ADMIN_EMAIL"];
     if (!email) return;
     await userManager.invite({ email, orgId: email, role: "super_admin" });
-    console.log(`[startup] Admin user '${email}' created (firebase strategy)`);
+    logger.info({ email, strategy: "firebase" }, "Admin user created");
   } else {
     const email = process.env["ADMIN_EMAIL"] ?? process.env["ADMIN_USERNAME"];
     const password = process.env["ADMIN_PASSWORD"];
     if (!email || !password) return;
     await userManager.create({ email, password, orgId: email, role: "super_admin" });
-    console.log(`[startup] Admin user '${email}' created`);
+    logger.info({ email, strategy: "password" }, "Admin user created");
   }
 }
 
 main().catch((err) => {
-  console.error("[fatal] Failed to start server:", err);
+  logger.fatal({ err }, "Failed to start server");
   process.exit(1);
 });
 

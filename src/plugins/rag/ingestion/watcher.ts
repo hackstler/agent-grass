@@ -1,3 +1,4 @@
+import { logger } from "../../../shared/logger.js";
 import { watch } from "fs";
 import { join, extname } from "path";
 import { readdir, stat } from "fs/promises";
@@ -11,7 +12,7 @@ const SUPPORTED_EXTENSIONS = new Set([".pdf", ".md", ".mdx", ".html", ".htm", ".
  * Useful for document drop-box workflows.
  */
 export function watchDirectory(dirPath: string, orgId: string): () => void {
-  console.log(`[watcher] Watching ${dirPath} for new documents...`);
+  logger.info({ dirPath }, "Watching directory for new documents");
 
   const watcher = watch(dirPath, { recursive: false }, async (event, filename) => {
     if (!filename) return;
@@ -26,19 +27,19 @@ export function watchDirectory(dirPath: string, orgId: string): () => void {
       const fileStat = await stat(fullPath);
       if (!fileStat.isFile()) return;
 
-      console.log(`[watcher] New file detected: ${filename}`);
+      logger.info({ filename }, "New file detected");
       const loaded = await loadDocument(fullPath);
       const result = await processDocument(loaded, orgId);
 
       if (result.status === "indexed") {
-        console.log(`[watcher] Indexed ${filename}: ${result.chunkCount} chunks`);
+        logger.info({ filename, chunkCount: result.chunkCount }, "File indexed successfully");
       } else {
-        console.error(`[watcher] Failed to index ${filename}: ${result.error}`);
+        logger.error({ filename, error: result.error }, "Failed to index file");
       }
     } catch (error) {
       // File might not exist yet (rename event fires on delete too)
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        console.error(`[watcher] Error processing ${filename}:`, error);
+        logger.error({ filename, err: error }, "Error processing file");
       }
     }
   });
@@ -53,20 +54,20 @@ export async function ingestDirectory(dirPath: string, orgId: string): Promise<v
   const entries = await readdir(dirPath);
   const files = entries.filter((f) => SUPPORTED_EXTENSIONS.has(extname(f).toLowerCase()));
 
-  console.log(`[ingest] Found ${files.length} files in ${dirPath}`);
+  logger.info({ fileCount: files.length, dirPath }, "Found files for ingestion");
 
   for (const file of files) {
     const fullPath = join(dirPath, file);
     try {
       const loaded = await loadDocument(fullPath);
       const result = await processDocument(loaded, orgId);
-      console.log(
-        result.status === "indexed"
-          ? `[ingest] ✓ ${file} (${result.chunkCount} chunks)`
-          : `[ingest] ✗ ${file}: ${result.error}`
-      );
+      if (result.status === "indexed") {
+        logger.info({ file, chunkCount: result.chunkCount }, "File ingested successfully");
+      } else {
+        logger.error({ file, error: result.error }, "File ingestion failed");
+      }
     } catch (error) {
-      console.error(`[ingest] Error loading ${file}:`, error);
+      logger.error({ file, err: error }, "Error loading file for ingestion");
     }
   }
 }

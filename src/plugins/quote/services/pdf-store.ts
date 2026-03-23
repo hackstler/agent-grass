@@ -11,6 +11,8 @@
  *   Controller: retrieves PDF by the same pdfRequestId
  */
 
+import { logger } from "../../../shared/logger.js";
+
 interface PdfEntry {
   pdfBase64: string;
   filename: string;
@@ -34,17 +36,17 @@ export const pdfStore = {
   set(requestId: string, pdf: { pdfBase64: string; filename: string }) {
     cleanup();
     store.set(requestId, { ...pdf, timestamp: Date.now() });
-    console.log(`[pdfStore] stored: ${pdf.filename} (key=${requestId.slice(0, 8)}, ${Math.round(pdf.pdfBase64.length / 1024)}KB)`);
+    logger.info({ filename: pdf.filename, key: requestId.slice(0, 8), sizeKB: Math.round(pdf.pdfBase64.length / 1024) }, "PDF stored");
   },
 
   take(requestId: string): { pdfBase64: string; filename: string } | null {
     const entry = store.get(requestId);
     if (!entry) {
-      console.log(`[pdfStore] miss: key=${requestId.slice(0, 8)} (store size=${store.size})`);
+      logger.info({ key: requestId.slice(0, 8), storeSize: store.size }, "PDF store miss");
       return null;
     }
     store.delete(requestId);
-    console.log(`[pdfStore] retrieved: ${entry.filename} (key=${requestId.slice(0, 8)})`);
+    logger.info({ filename: entry.filename, key: requestId.slice(0, 8) }, "PDF retrieved");
     return { pdfBase64: entry.pdfBase64, filename: entry.filename };
   },
 };

@@ -1,3 +1,4 @@
+import { logger } from "../../../shared/logger.js";
 import type { RetrievedChunk, RerankerOptions } from "./interfaces.js";
 
 export type { RerankerOptions };
@@ -34,7 +35,7 @@ async function rerankWithCohere(
 ): Promise<RetrievedChunk[]> {
   const apiKey = process.env["COHERE_API_KEY"];
   if (!apiKey) {
-    console.warn("[reranker] COHERE_API_KEY not set, skipping reranking");
+    logger.warn("COHERE_API_KEY not set, skipping reranking");
     return chunks.slice(0, topK);
   }
 
@@ -53,7 +54,7 @@ async function rerankWithCohere(
   });
 
   if (!response.ok) {
-    console.error("[reranker] Cohere API error:", response.statusText);
+    logger.error({ status: response.status, statusText: response.statusText }, "Cohere API error");
     return chunks.slice(0, topK);
   }
 

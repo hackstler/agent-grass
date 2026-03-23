@@ -1,3 +1,4 @@
+import { logger } from "../../../shared/logger.js";
 import { db } from "../../../infrastructure/db/client.js";
 import { documents, documentChunks } from "../../../infrastructure/db/schema.js";
 import { eq, sql } from "drizzle-orm";
@@ -33,7 +34,7 @@ export async function processDocument(
   //    Using source match (not findFirst) to avoid race-condition duplicates.
   const deleted = await db.delete(documents).where(eq(documents.source, source)).returning({ id: documents.id });
   if (deleted.length > 0) {
-    console.log(`[processor] Re-ingesting: ${source} (removed ${deleted.length} previous)`);
+    logger.info({ source, removedCount: deleted.length }, "Re-ingesting document");
   }
 
   // 2. Enrich document with LLM-extracted metadata
@@ -41,7 +42,7 @@ export async function processDocument(
   let resolvedTopicId = topicId ?? null;
 
   try {
-    console.log(`[processor] Enriching: ${source}`);
+    logger.info({ source }, "Enriching document");
     const enrichment = await enrichDocument(loaded.content, enrichedMetadata);
 
     enrichedMetadata = {
@@ -55,10 +56,10 @@ export async function processDocument(
     // 3. Resolve topic (auto-create if needed)
     if (!topicId && enrichment.suggestedTopic) {
       resolvedTopicId = await resolveTopic(orgId, enrichment.suggestedTopic);
-      console.log(`[processor] Topic: "${enrichment.suggestedTopic}" → ${resolvedTopicId}`);
+      logger.info({ suggestedTopic: enrichment.suggestedTopic, topicId: resolvedTopicId }, "Topic resolved");
     }
   } catch (err) {
-    console.warn(`[processor] Enrichment failed, continuing without: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn({ err }, "Enrichment failed, continuing without");
   }
 
   // 4. Create document record
@@ -90,13 +91,13 @@ export async function processDocument(
       throw new Error("Document produced no chunks after processing");
     }
 
-    console.log(`[processor] ${source} → ${rawChunks.length} chunks (strategy: ${chunkerOpts.strategy})`);
+    logger.info({ source, chunkCount: rawChunks.length, strategy: chunkerOpts.strategy }, "Document chunked");
 
     // 6. Contextualize chunks with LLM-generated prefixes
     let contextualizedChunks: Array<{ content: string; contextPrefix: string; metadata: typeof rawChunks[0]["metadata"] }>;
 
     try {
-      console.log(`[processor] Contextualizing ${rawChunks.length} chunks...`);
+      logger.info({ chunkCount: rawChunks.length }, "Contextualizing chunks");
       const contextualized = await contextualizeChunks(loaded.content, rawChunks);
       contextualizedChunks = contextualized.map((c) => ({
         content: c.content,
@@ -104,7 +105,7 @@ export async function processDocument(
         metadata: c.metadata,
       }));
     } catch (err) {
-      console.warn(`[processor] Contextualization failed, continuing without: ${err instanceof Error ? err.message : String(err)}`);
+      logger.warn({ err }, "Contextualization failed, continuing without");
       contextualizedChunks = rawChunks.map((c) => ({
         content: c.content,
         contextPrefix: "",
@@ -161,7 +162,7 @@ export async function processDocument(
     return { documentId, chunkCount: contextualizedChunks.length, status: "indexed" };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[processor] Failed: ${source} — ${errorMessage}`);
+    logger.error({ source, err: error }, "Document processing failed");
 
     await db
       .update(documents)

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { logger } from "../../shared/logger.js";
 import type { OAuthManager } from "../../application/managers/oauth.manager.js";
 
 export function createOAuthController(oauthManager: OAuthManager): Hono {
@@ -27,7 +28,7 @@ export function createOAuthController(oauthManager: OAuthManager): Hono {
       return c.redirect(`${base}?googleConnected=true`);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";
-      console.error("[oauth/callback] error:", msg);
+      logger.error({ err: msg }, "OAuth callback error");
       const base = process.env["FRONTEND_URL"] || "http://localhost:5174";
       return c.redirect(`${base}?googleError=${encodeURIComponent(msg)}`);
     }

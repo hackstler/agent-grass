@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
+import { pinoLogger } from "hono-pino";
 import { secureHeaders } from "hono/secure-headers";
+import { logger } from "./shared/logger.js";
 import { authMiddleware, optionalAuth, requireRole, requirePermission, requireWorker } from "./api/middleware/auth.js";
 import { errorHandler, domainErrorToHttpStatus } from "./api/middleware/error-handler.middleware.js";
 import { DomainError } from "./domain/errors/index.js";
@@ -61,7 +62,7 @@ export function createApp(deps: AppDependencies): Hono {
   const app = new Hono();
 
   // ── Global middleware ────────────────────────────────────────────────────────
-  app.use("*", logger());
+  app.use(pinoLogger({ pino: logger }));
   app.use("*", secureHeaders());
   app.use(
     "*",
@@ -166,7 +167,7 @@ export function createApp(deps: AppDependencies): Hono {
       const category = err.constructor.name.replace(/Error$/, "");
       return c.json({ error: category, message: err.message }, status);
     }
-    console.error("[error]", err);
+    logger.error({ err }, "Unhandled error");
     return c.json({ error: "InternalError", message: err.message }, 500);
   });
 

@@ -6,6 +6,7 @@ import { getAgentContextValue } from "../application/agent-context.js";
 import { loadConversationHistory } from "./load-history.js";
 import type { ConversationManager } from "../application/managers/conversation.manager.js";
 import { ragConfig } from "../plugins/rag/config/rag.config.js";
+import { logger } from "../shared/logger.js";
 
 /**
  * Creates a single delegation tool that wraps a plugin's agent.
@@ -46,9 +47,7 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager) 
         });
 
         if (!result.text?.trim()) {
-          console.error(`[delegation] ${plugin.id} returned empty response`, {
-            steps: result.steps.length,
-          });
+          logger.error({ pluginId: plugin.id, steps: result.steps.length }, "Plugin returned empty response");
           return { text: `Error: ${plugin.name} no pudo procesar la solicitud. Inténtalo de nuevo.`, toolResults: [] };
         }
 
@@ -57,7 +56,7 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager) 
 
         return { text: result.text, toolResults };
       } catch (error) {
-        console.error(`[delegation] ${plugin.id} error:`, error);
+        logger.error({ err: error, pluginId: plugin.id }, "Delegation error");
         return { text: `Error al delegar a ${plugin.name}: ${error instanceof Error ? error.message : "error desconocido"}`, toolResults: [] };
       }
     },

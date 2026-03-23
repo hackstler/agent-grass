@@ -6,6 +6,7 @@ import { entityEvents, type EntityEvent } from "../../application/events/entity-
 import { CatalogIndexer } from "./services/catalog-indexer.js";
 import { createCatalogCrudTools } from "./tools/index.js";
 import { createCatalogManagerAgent } from "./catalog-manager.agent.js";
+import { logger } from "../../shared/logger.js";
 
 export interface CatalogManagerPluginDeps {
   catalogManager: CatalogManager;
@@ -53,11 +54,11 @@ export class CatalogManagerPlugin implements Plugin {
 
           if (event.type === "catalog:deleted") {
             this.catalogIndexer.remove(catalogId).catch((err) => {
-              console.error(`[catalog-manager] failed to remove index for ${catalogId}:`, err);
+              logger.error({ err, catalogId }, "Failed to remove catalog index");
             });
           } else {
             this.catalogIndexer.index(orgId, catalogId).catch((err) => {
-              console.error(`[catalog-manager] failed to re-index catalog ${catalogId}:`, err);
+              logger.error({ err, catalogId }, "Failed to re-index catalog");
             });
           }
         }, 2000)
@@ -67,12 +68,12 @@ export class CatalogManagerPlugin implements Plugin {
     entityEvents.on("entity", this.listener);
 
     // Index all existing catalogs on startup
-    console.log("[catalog-manager] indexing existing catalogs...");
+    logger.info("Indexing existing catalogs on startup");
     try {
       const { indexed, failed } = await this.catalogIndexer.indexAllOrgs();
-      console.log(`[catalog-manager] startup indexing complete: ${indexed} indexed, ${failed} failed`);
+      logger.info({ indexed, failed }, "Startup catalog indexing complete");
     } catch (err) {
-      console.error("[catalog-manager] startup indexing error (non-fatal):", err);
+      logger.error({ err }, "Startup catalog indexing error (non-fatal)");
     }
   }
 

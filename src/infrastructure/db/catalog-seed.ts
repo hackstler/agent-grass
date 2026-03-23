@@ -4,6 +4,7 @@ import { catalogs, catalogItems, grassPricing } from "./schema.js";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { logger } from "../../shared/logger.js";
 
 interface GrassTypeEntry {
   name: string;
@@ -52,12 +53,12 @@ export async function seedCatalog(orgId: string): Promise<void> {
       .where(eq(catalogItems.catalogId, existing.id));
 
     if (pricingCount && pricingCount.count > 0) {
-      console.log(`[seed:catalog] Active catalog with ${pricingCount.count} grass_pricing rows for org "${orgId}", skipping`);
+      logger.info({ orgId, pricingRows: pricingCount.count }, "active catalog already seeded, skipping");
       return;
     }
 
     // Catalog exists but no pricing → delete old catalog and recreate
-    console.log(`[seed:catalog] Deleting old catalog without pricing for org "${orgId}"`);
+    logger.info({ orgId }, "deleting old catalog without pricing");
     await db.delete(catalogs).where(eq(catalogs.id, existing.id));
   }
 
@@ -115,7 +116,5 @@ export async function seedCatalog(orgId: string): Promise<void> {
     inserted += batch.length;
   }
 
-  console.log(
-    `[seed:catalog] Created catalog "${catalogId}" with ${insertedItems.length} grass types and ${inserted} pricing rows for org "${orgId}"`
-  );
+  logger.info({ catalogId, grassTypes: insertedItems.length, pricingRows: inserted, orgId }, "catalog seeded");
 }

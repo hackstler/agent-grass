@@ -1,3 +1,4 @@
+import { logger } from "../../../shared/logger.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { Chunk } from "../pipeline/chunker.js";
 
@@ -49,7 +50,7 @@ Responde SOLO con el contexto, sin prefijos ni explicaciones.`;
           const result = await model.generateContent(prompt);
           return result.response.text().trim();
         } catch (err) {
-          console.warn(`[contextualizer] Failed for chunk ${chunk.metadata.chunkIndex}: ${err instanceof Error ? err.message : String(err)}`);
+          logger.warn({ chunkIndex: chunk.metadata.chunkIndex, err }, "Contextualization failed for chunk");
           return "";
         }
       })

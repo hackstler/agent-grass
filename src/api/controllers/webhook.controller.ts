@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import crypto from "crypto";
+import { logger } from "../../shared/logger.js";
 import type { AgentRunner } from "../../agent/agent-runner.js";
 import type { ConversationManager } from "../../application/managers/conversation.manager.js";
 import type { OrganizationRepository } from "../../domain/ports/repositories/organization.repository.js";
@@ -87,11 +88,11 @@ export function createWebhookController(
 
       if (!phoneNumberId || !customerPhone) continue;
 
-      console.log("[webhook] processing:", { messageId, customerPhone, phoneNumberId, text: body.slice(0, 50) });
+      logger.info({ messageId, customerPhone, phoneNumberId, text: body.slice(0, 50) }, "Webhook processing message");
 
       // Fire and forget — respond 200 immediately, process in background
       processMessage(body, messageId, phoneNumberId, customerPhone).catch((err) => {
-        console.error("[webhook] async error:", messageId, err);
+        logger.error({ err, messageId }, "Webhook async processing error");
       });
     }
 
@@ -107,7 +108,7 @@ export function createWebhookController(
     // Resolve user by their phone number
     const user = await userRepo.findByPhone(customerPhone);
     if (!user) {
-      console.warn("[webhook] No user found for phone:", customerPhone);
+      logger.warn({ customerPhone }, "No user found for phone");
       await whatsapp.sendText(phoneNumberId, customerPhone,
         "No tienes acceso a este servicio. Regístrate en la plataforma y añade tu número de teléfono.");
       return;
@@ -140,7 +141,7 @@ export function createWebhookController(
 
     const replyText = result.text?.trim();
     if (!replyText) {
-      console.warn("[webhook] Empty response for:", messageId);
+      logger.warn({ messageId }, "Empty agent response");
       return;
     }
 
@@ -154,7 +155,7 @@ export function createWebhookController(
         toolCalls: toolSummaries,
       });
     } catch (err) {
-      console.error("[webhook] persist failed:", err);
+      logger.error({ err }, "Webhook message persist failed");
     }
 
     // Reply

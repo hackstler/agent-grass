@@ -4,7 +4,7 @@ import type { AgentContext, AgentGenerateResult, AgentStreamResult } from "./typ
 
 export interface AgentRunnerConfig {
   model: LanguageModel;
-  system: string;
+  system: string | (() => string);
   tools: ToolSet;
   maxSteps?: number;
 }
@@ -48,9 +48,11 @@ export class AgentRunner {
       { role: "user" as const, content: prompt },
     ];
 
+    const system = typeof this.config.system === "function" ? this.config.system() : this.config.system;
+
     const result = await generateText({
       model: this.config.model,
-      system: this.config.system,
+      system,
       messages: allMessages,
       tools: this.config.tools,
       stopWhen: stepCountIs(maxSteps ?? this.config.maxSteps),
@@ -77,9 +79,11 @@ export class AgentRunner {
       { role: "user" as const, content: prompt },
     ];
 
+    const system = typeof this.config.system === "function" ? this.config.system() : this.config.system;
+
     return streamText({
       model: this.config.model,
-      system: this.config.system,
+      system,
       messages: allMessages,
       tools: this.config.tools,
       stopWhen: stepCountIs(maxSteps ?? this.config.maxSteps),

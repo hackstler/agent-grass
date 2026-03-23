@@ -1,4 +1,5 @@
 import type { AttachmentStore, StoredAttachment } from "../../domain/ports/attachment-store.js";
+import { logger } from "../../shared/logger.js";
 
 interface CacheEntry {
   attachment: StoredAttachment;
@@ -24,7 +25,7 @@ export class InMemoryAttachmentStore implements AttachmentStore {
   store(filename: string, attachment: StoredAttachment): void {
     this.cleanup();
     this.cache.set(filename, { attachment, timestamp: Date.now() });
-    console.log(`[attachmentStore] stored: ${filename} (${Math.round(attachment.base64.length / 1024)}KB, store size=${this.cache.size})`);
+    logger.info({ filename, sizeKB: Math.round(attachment.base64.length / 1024), storeSize: this.cache.size }, "attachment stored");
   }
 
   retrieve(filename: string): StoredAttachment | null {
@@ -32,10 +33,10 @@ export class InMemoryAttachmentStore implements AttachmentStore {
     const entry = this.cache.get(filename);
     if (!entry) {
       const keys = [...this.cache.keys()];
-      console.log(`[attachmentStore] miss: ${filename} (store size=${this.cache.size}, keys=${JSON.stringify(keys)})`);
+      logger.info({ filename, storeSize: this.cache.size, keys }, "attachment miss");
       return null;
     }
-    console.log(`[attachmentStore] hit: ${filename}`);
+    logger.info({ filename }, "attachment hit");
     return entry.attachment;
   }
 
@@ -48,7 +49,7 @@ export class InMemoryAttachmentStore implements AttachmentStore {
       }
     }
     if (latest) {
-      console.log(`[attachmentStore] prefix match: ${prefix}* → ${latest.attachment.filename}`);
+      logger.info({ prefix, matchedFilename: latest.attachment.filename }, "attachment prefix match");
     }
     return latest?.attachment ?? null;
   }

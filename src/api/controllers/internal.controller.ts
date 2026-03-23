@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import { logger } from "../../shared/logger.js";
 import type { AgentRunner } from "../../agent/agent-runner.js";
 import type { AgentStep, AgentGenerateResult, DelegationResult } from "../../agent/types.js";
 import { extractToolSummaries } from "../../agent/tool-summaries.js";
@@ -145,15 +146,11 @@ export function createInternalController(
 
         if (replyText) break;
 
-        console.warn(`[internal/message] empty response attempt ${attempt}/${MAX_ATTEMPTS}`, {
-          userId,
-          stepsCount: result.steps.length,
-          textLength: result.text.length,
-        });
+        logger.warn({ userId, attempt, maxAttempts: MAX_ATTEMPTS, stepsCount: result.steps.length, textLength: result.text.length }, "Empty agent response, retrying");
       }
 
       if (!replyText || !result) {
-        console.error("[internal/message] agent returned empty response after all retries", { userId });
+        logger.error({ userId }, "Agent returned empty response after all retries");
         return c.json({
           data: { reply: "Lo siento, no pude procesar tu solicitud. Por favor, inténtalo de nuevo." },
         });
@@ -171,7 +168,7 @@ export function createInternalController(
           toolCalls: toolSummaries,
         });
       } catch (persistError) {
-        console.error("[internal/message] failed to persist messages:", persistError);
+        logger.error({ err: persistError }, "Failed to persist messages");
       }
 
       const waText = formatForWhatsApp(replyText) + buildSourcesFooter(sources);
@@ -185,7 +182,7 @@ export function createInternalController(
           mimetype: "application/pdf",
           filename: storeEntry.filename,
         };
-        console.log("[internal/message] PDF attached:", document.filename);
+        logger.info({ filename: document.filename }, "PDF attached to reply");
       }
 
       return c.json({
@@ -195,7 +192,7 @@ export function createInternalController(
         },
       });
     } catch (error) {
-      console.error("[internal/message] agent error:", error);
+      logger.error({ err: error }, "Agent error processing WhatsApp message");
       return c.json({ error: "Agent unavailable" }, 503);
     }
   });

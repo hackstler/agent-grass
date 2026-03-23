@@ -4,6 +4,7 @@ import { Pool } from "pg";
 import { resolve } from "path";
 import { existsSync } from "fs";
 import * as schema from "./schema.js";
+import { logger } from "../../shared/logger.js";
 
 const DATABASE_URL = process.env["DATABASE_URL"];
 if (!DATABASE_URL) {
@@ -51,12 +52,11 @@ export async function runMigrations(): Promise<void> {
   );
 
   if (!migrationsFolder) {
-    console.warn("[migrations] no meta/_journal.json found, checked:", candidates.join(", "));
-    console.warn("[migrations] skipping drizzle migrate — schema must already exist in DB");
+    logger.warn({ candidates }, "no meta/_journal.json found, skipping drizzle migrate — schema must already exist in DB");
     return;
   }
 
-  console.log(`[migrations] using: ${migrationsFolder}`);
+  logger.info({ migrationsFolder }, "using migrations folder");
 
   // Clean up broken auto-generated migration (0006_petite_anthem) that was deployed by mistake.
   // Its folderMillis was 1772905955669 — newer than the hand-written migrations,

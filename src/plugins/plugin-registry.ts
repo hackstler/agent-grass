@@ -3,6 +3,7 @@ import type { AgentTools } from "../agent/types.js";
 import type { Plugin } from "./plugin.interface.js";
 import type { ConversationManager } from "../application/managers/conversation.manager.js";
 import { createDelegationTools } from "../agent/delegation.js";
+import { logger } from "../shared/logger.js";
 
 export class PluginRegistry {
   private plugins = new Map<string, Plugin>();
@@ -12,7 +13,7 @@ export class PluginRegistry {
       throw new Error(`Plugin "${plugin.id}" is already registered`);
     }
     this.plugins.set(plugin.id, plugin);
-    console.log(`[plugins] registered: ${plugin.id} (${plugin.name})`);
+    logger.info({ pluginId: plugin.id, pluginName: plugin.name }, "Plugin registered");
   }
 
   get(id: string): Plugin {
@@ -46,7 +47,7 @@ export class PluginRegistry {
         // Routes are mounted by the caller at the appropriate paths
         // The plugin's routes() returns a Hono instance with its own paths
         app.route("/", router);
-        console.log(`[plugins] mounted routes for: ${plugin.id}`);
+        logger.info({ pluginId: plugin.id }, "Plugin routes mounted");
       }
     }
   }
@@ -55,7 +56,7 @@ export class PluginRegistry {
     for (const plugin of this.plugins.values()) {
       if (plugin.ensureTables) {
         await plugin.ensureTables();
-        console.log(`[plugins] tables ready: ${plugin.id}`);
+        logger.info({ pluginId: plugin.id }, "Plugin tables ready");
       }
     }
   }
@@ -64,7 +65,7 @@ export class PluginRegistry {
     for (const plugin of this.plugins.values()) {
       if (plugin.initialize) {
         await plugin.initialize();
-        console.log(`[plugins] initialized: ${plugin.id}`);
+        logger.info({ pluginId: plugin.id }, "Plugin initialized");
       }
     }
   }
@@ -73,7 +74,7 @@ export class PluginRegistry {
     for (const plugin of this.plugins.values()) {
       if (plugin.shutdown) {
         await plugin.shutdown();
-        console.log(`[plugins] shut down: ${plugin.id}`);
+        logger.info({ pluginId: plugin.id }, "Plugin shut down");
       }
     }
   }
