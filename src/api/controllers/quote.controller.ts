@@ -4,12 +4,12 @@ import type { QuoteRepository } from "../../domain/ports/repositories/quote.repo
 export function createQuoteController(quoteRepo: QuoteRepository): Hono {
   const router = new Hono();
 
-  // GET / — list quotes for the org (WITHOUT pdfBase64, only metadata)
+  // GET / — list quotes for the authenticated user (WITHOUT pdfBase64, only metadata)
   router.get("/", async (c) => {
-    const orgId = c.get("user")?.orgId;
-    if (!orgId) return c.json({ error: "Unauthorized", message: "No orgId in token" }, 401);
+    const userId = c.get("user")?.userId;
+    if (!userId) return c.json({ error: "Unauthorized", message: "No userId in token" }, 401);
 
-    const rows = await quoteRepo.findByOrg(orgId);
+    const rows = await quoteRepo.findByUser(userId);
 
     // Strip pdfBase64 from the listing response — it can be large
     const items = rows.map(({ pdfBase64: _, ...rest }) => rest);
