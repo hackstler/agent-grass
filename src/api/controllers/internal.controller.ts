@@ -12,6 +12,7 @@ import { loadConversationHistory } from "../../agent/load-history.js";
 import { extractSources } from "../helpers/extract-sources.js";
 import { formatForWhatsApp, buildSourcesFooter } from "../helpers/format-whatsapp.js";
 import { findPdfFilename } from "../helpers/find-pdf-filename.js";
+import { findEmailDraft } from "../helpers/find-email-draft.js";
 import { ragConfig } from "../../plugins/rag/config/rag.config.js";
 
 export interface DocumentAttachment {
@@ -197,10 +198,15 @@ export function createInternalController(
         logger.info("Skipping PDF attachment — email flow handled attachment via Gmail");
       }
 
+      // Detect email draft — worker channel can't send buttons, but include draft info
+      // so the worker knows not to treat the response as a final action.
+      const emailDraft = findEmailDraft(result);
+
       return c.json({
         data: {
           reply: waText,
           ...(document && { document }),
+          ...(emailDraft && { emailDraft }),
         },
       });
     } catch (error) {

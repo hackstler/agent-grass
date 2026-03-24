@@ -69,8 +69,8 @@ Rules:
 6. For email-related requests (list, read, search, send emails, send with attachments) → delegate to delegateTo_gmail.
    When delegating to delegateTo_gmail, ALWAYS include ALL available context: recipient, purpose/topic of the email,
    and any attachment filename if applicable. Pass the user's intent as-is — do NOT assume it's about quotes or any specific topic.
-   IMPORTANT: NEVER add "CONFIRMED:" to a gmail delegation unless the user is explicitly confirming
-   a previously shown email summary. A NEW send request (even if clear) is NOT a confirmation.
+   IMPORTANT: Gmail can ONLY create drafts. The email is NOT sent immediately — the user confirms via a Send button in the UI.
+   NEVER add "CONFIRMED:" to a gmail delegation. The confirmation happens outside the agent, via UI buttons.
 7. For calendar-related requests (list, create, update, delete events) → delegate to delegateTo_calendar.
    When delegating to delegateTo_calendar, ALWAYS resolve relative dates to absolute dates BEFORE delegating.
    Example: if the user says "pon una reunión mañana a las 3" and today is 2026-03-23, delegate with:

@@ -33,9 +33,11 @@ import { createOAuthController } from "./api/controllers/oauth.controller.js";
 import { createCatalogController } from "./api/controllers/catalog.controller.js";
 import { createQuoteController } from "./api/controllers/quote.controller.js";
 import { createWebhookController } from "./api/controllers/webhook.controller.js";
+import { createEmailController } from "./api/controllers/email.controller.js";
 import health from "./api/health.js";
 import type { WhatsAppChannel } from "./domain/ports/whatsapp-channel.js";
 import type { AttachmentStore } from "./domain/ports/attachment-store.js";
+import type { GmailApiService } from "./plugins/gmail/services/gmail-api.service.js";
 
 export interface AppDependencies {
   userManager: UserManager;
@@ -56,6 +58,7 @@ export interface AppDependencies {
   userRepo?: import("./domain/ports/repositories/user.repository.js").UserRepository;
   whatsappChannel?: WhatsAppChannel;
   attachmentStore?: AttachmentStore;
+  gmailService?: GmailApiService;
 }
 
 export function createApp(deps: AppDependencies): Hono {
@@ -139,6 +142,12 @@ export function createApp(deps: AppDependencies): Hono {
     app.route("/admin/catalogs", createCatalogController(deps.catalogManager, deps.organizationRepo));
   }
 
+  // Email draft confirmation — authenticated user
+  if (deps.gmailService && deps.attachmentStore) {
+    app.use("/emails/*", auth);
+    app.route("/emails", createEmailController(deps.gmailService, deps.attachmentStore));
+  }
+
   // Quotes — authenticated user
   if (deps.quoteRepo) {
     app.use("/quotes/*", auth);
@@ -149,7 +158,7 @@ export function createApp(deps: AppDependencies): Hono {
   if (deps.whatsappChannel && deps.organizationRepo && deps.userRepo && deps.attachmentStore) {
     app.route("/webhooks", createWebhookController(
       deps.coordinatorAgent, deps.convManager, deps.organizationRepo,
-      deps.userRepo, deps.whatsappChannel, deps.attachmentStore,
+      deps.userRepo, deps.whatsappChannel, deps.attachmentStore, deps.gmailService,
     ));
   }
 

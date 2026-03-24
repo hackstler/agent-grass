@@ -1,21 +1,28 @@
 import { tool } from "ai";
 import { z } from "zod";
-import type { GmailApiService } from "../services/gmail-api.service.js";
 import type { AttachmentStore } from "../../../domain/ports/attachment-store.js";
 import { getAgentContextValue } from "../../../application/agent-context.js";
+import { saveDraft } from "../services/draft-store.js";
 
 export interface SendEmailDeps {
-  gmailService: GmailApiService;
   attachmentStore: AttachmentStore;
 }
 
-export function createSendEmailTool({ gmailService, attachmentStore }: SendEmailDeps) {
+/**
+ * Prepare an email draft for user confirmation.
+ *
+ * Validates inputs, resolves attachment, saves a draft, returns a preview.
+ * The email is NEVER sent by the agent — the user confirms via the UI
+ * (dashboard button or WhatsApp interactive button), which calls
+ * POST /emails/confirm/:draftId.
+ */
+export function createSendEmailTool({ attachmentStore }: SendEmailDeps) {
   return tool({
     description:
-      `Send an email via the user's Gmail account, optionally with a file attachment.
-WARNING: This tool SENDS the email immediately — it does NOT ask for confirmation.
-The calling agent MUST present a summary and get user confirmation BEFORE calling this tool.
-Requires the user's Google account to be connected.
+      `Prepare an email draft for the user to review before sending.
+This tool does NOT send the email — it creates a draft and returns a preview.
+The user will confirm or cancel the email outside of this conversation (via a button in the UI).
+You CANNOT send the email yourself — there is no tool for that.
 To attach a previously generated document (e.g., a PDF quote), provide its filename
 exactly as shown when it was generated (e.g., "PRES-20260306-1234.pdf").
 Use listQuotes first to find the correct filename if the user refers to an old quote.`,
@@ -39,13 +46,9 @@ Use listQuotes first to find the correct filename if the user refers to an old q
     }),
     execute: async ({ to, subject, body, attachmentFilename }, { experimental_context }) => {
       const userId = getAgentContextValue({ experimental_context }, "userId");
-      if (!userId) throw new Error('Missing userId in request context');
+      if (!userId) throw new Error("Missing userId in request context");
 
-      const orgId = getAgentContextValue({ experimental_context }, "orgId");
-      if (!orgId) throw new Error('Missing orgId in request context');
-
-      let attachment: { base64: string; mimetype: string; filename: string } | undefined;
-
+      // Validate attachment exists (fail early, before showing draft to user)
       if (attachmentFilename) {
         const stored = await attachmentStore.retrieve(userId, attachmentFilename);
         if (!stored) {
@@ -57,11 +60,23 @@ Use listQuotes first to find the correct filename if the user refers to an old q
             retryable: true,
           };
         }
-        attachment = stored;
       }
 
-      const result = await gmailService.sendEmail(userId, to, subject, body, attachment);
-      return { ...result, attachmentIncluded: !!attachment };
+      // Save draft for later confirmation
+      const draftId = saveDraft({ to, subject, body, attachmentFilename });
+
+      return {
+        success: true,
+        draft: true,
+        draftId,
+        preview: {
+          to,
+          subject,
+          body: body.length > 200 ? body.slice(0, 200) + "…" : body,
+          attachmentFilename: attachmentFilename ?? null,
+        },
+        message: "Draft created. The user will see a confirmation button to send or cancel this email.",
+      };
     },
   });
 }

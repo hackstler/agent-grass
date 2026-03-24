@@ -91,7 +91,8 @@ pluginRegistry.register(ragPlugin);
 const oauthProvider = new OAuthManagerAdapter(oauthManager);
 const attachmentRepo = new DrizzleAttachmentRepository();
 const attachmentStore = new PersistentAttachmentStore(attachmentRepo);
-pluginRegistry.register(new GmailPlugin(oauthProvider, attachmentStore));
+const gmailPlugin = new GmailPlugin(oauthProvider, attachmentStore);
+pluginRegistry.register(gmailPlugin);
 pluginRegistry.register(new CalendarPlugin(oauthProvider));
 pluginRegistry.register(new QuotePlugin({ attachmentStore, organizationRepo: orgRepo, quoteRepo }));
 pluginRegistry.register(new CatalogManagerPlugin({ catalogManager, catalogRepo }));
@@ -130,6 +131,7 @@ const app = createApp({
   userRepo,
   ...(whatsappChannel ? { whatsappChannel } : {}),
   attachmentStore,
+  gmailService: gmailPlugin.gmailService,
 });
 
 // ── Startup ────────────────────────────────────────────────────────────────────

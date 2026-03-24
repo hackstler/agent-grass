@@ -8,6 +8,7 @@ import { extractToolSummaries, summarizeToolCall } from "../../../agent/tool-sum
 import { ragConfig } from "../config/rag.config.js";
 import { extractSources } from "../../../api/helpers/extract-sources.js";
 import { findPdfFilename } from "../../../api/helpers/find-pdf-filename.js";
+import { findEmailDraft } from "../../../api/helpers/find-email-draft.js";
 import { createAgentContext } from "../../../application/agent-context.js";
 import { loadConversationHistory } from "../../../agent/load-history.js";
 import type { ConversationManager } from "../../../application/managers/conversation.manager.js";
@@ -238,6 +239,14 @@ export function createChatRoutes(agent: AgentRunner, convManager: ConversationMa
                       attachmentEmitted = true;
                     }
                   }
+                }
+              }
+
+              // Detect email drafts — emit event so the frontend shows Send/Cancel buttons
+              {
+                const emailDraft = findEmailDraft(result);
+                if (emailDraft) {
+                  await emit({ type: "email-draft", draftId: emailDraft.draftId, preview: emailDraft.preview });
                 }
               }
               break;

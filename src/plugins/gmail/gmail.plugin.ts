@@ -15,13 +15,15 @@ export class GmailPlugin implements Plugin {
   readonly description = "List, read, search, and send emails via Gmail. Can attach previously generated documents (e.g., PDF quotes).";
   readonly agent;
   readonly tools: AgentTools;
+  /** GmailApiService exposed for the email confirm endpoint (sends drafts outside of the agent). */
+  readonly gmailService: GmailApiService;
 
   constructor(tokenProvider: OAuthTokenProvider, attachmentStore: AttachmentStore) {
-    const service = new GmailApiService(tokenProvider);
-    const listEmails = createListEmailsTool({ gmailService: service });
-    const readEmail = createReadEmailTool({ gmailService: service });
-    const sendEmail = createSendEmailTool({ gmailService: service, attachmentStore });
-    const searchEmails = createSearchEmailsTool({ gmailService: service });
+    this.gmailService = new GmailApiService(tokenProvider);
+    const listEmails = createListEmailsTool({ gmailService: this.gmailService });
+    const readEmail = createReadEmailTool({ gmailService: this.gmailService });
+    const sendEmail = createSendEmailTool({ attachmentStore });
+    const searchEmails = createSearchEmailsTool({ gmailService: this.gmailService });
 
     this.tools = { listEmails, readEmail, sendEmail, searchEmails };
     this.agent = createGmailAgent(this.tools);

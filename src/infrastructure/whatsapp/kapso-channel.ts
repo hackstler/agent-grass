@@ -1,4 +1,4 @@
-import type { WhatsAppChannel } from "../../domain/ports/whatsapp-channel.js";
+import type { WhatsAppChannel, InteractiveButton } from "../../domain/ports/whatsapp-channel.js";
 import { logger } from "../../shared/logger.js";
 
 const KAPSO_BASE = "https://api.kapso.ai/meta/whatsapp/v24.0";
@@ -79,6 +79,42 @@ export class KapsoChannel implements WhatsAppChannel {
     if (!res.ok) {
       const err = await res.text().catch(() => "");
       logger.error({ statusCode: res.status, responseBody: err }, "sendDocument failed");
+    }
+  }
+
+  async sendInteractiveButtons(
+    phoneNumberId: string,
+    to: string,
+    body: string,
+    buttons: InteractiveButton[],
+  ): Promise<void> {
+    const res = await fetch(`${KAPSO_BASE}/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": this.apiKey,
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: { text: body },
+          action: {
+            buttons: buttons.map((btn) => ({
+              type: "reply",
+              reply: { id: btn.id, title: btn.title },
+            })),
+          },
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      logger.error({ statusCode: res.status, responseBody: err }, "sendInteractiveButtons failed");
     }
   }
 
