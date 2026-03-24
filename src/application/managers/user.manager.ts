@@ -30,6 +30,7 @@ export interface CreateUserDto {
 
 export interface InviteUserDto {
   email: string;
+  phone?: string;
   orgId: string;
   role?: "admin" | "user" | "super_admin";
 }
@@ -48,6 +49,7 @@ export interface UpdateUserDto {
   email?: string | undefined;
   name?: string | undefined;
   surname?: string | undefined;
+  phone?: string | null | undefined;
   role?: "admin" | "user" | "super_admin" | undefined;
   password?: string | undefined;
   orgId?: string | undefined;
@@ -80,6 +82,13 @@ export class UserManager {
     if (value == null) return null;
     const trimmed = value.trim();
     return trimmed || null;
+  }
+
+  /** Normalize phone to digits-only (E.164 without +). Matches findByPhone query normalization. */
+  private normalizePhone(value: string | null | undefined): string | null {
+    if (value == null) return null;
+    const digits = value.replace(/[^0-9]/g, "");
+    return digits || null;
   }
 
   async register(
@@ -193,6 +202,7 @@ export class UserManager {
     const role = dto.role ?? "user";
     const user = await this.repo.create({
       email,
+      phone: this.normalizePhone(dto.phone),
       orgId: dto.orgId.trim(),
       role,
       metadata: { authStrategy: "firebase" },
@@ -254,6 +264,7 @@ export class UserManager {
     if (normalizedEmail) updateData["email"] = normalizedEmail;
     if (dto.name !== undefined) updateData["name"] = this.trimOrNull(dto.name);
     if (dto.surname !== undefined) updateData["surname"] = this.trimOrNull(dto.surname);
+    if (dto.phone !== undefined) updateData["phone"] = this.normalizePhone(dto.phone);
     if (dto.role) updateData["role"] = dto.role;
     if (dto.orgId) updateData["orgId"] = dto.orgId.trim();
     if (dto.password) {
@@ -298,7 +309,7 @@ export class UserManager {
       email,
       name: this.trimOrNull(dto.firstName),
       surname: this.trimOrNull(dto.lastName),
-      phone: this.trimOrNull(dto.phone),
+      phone: this.normalizePhone(dto.phone),
       orgId: dto.orgId.trim(),
       role,
       metadata,
@@ -338,7 +349,7 @@ export class UserManager {
     if (normalizedEmail) updateData["email"] = normalizedEmail;
     if (dto.name !== undefined) updateData["name"] = this.trimOrNull(dto.name);
     if (dto.surname !== undefined) updateData["surname"] = this.trimOrNull(dto.surname);
-    if (dto.phone !== undefined) updateData["phone"] = this.trimOrNull(dto.phone);
+    if (dto.phone !== undefined) updateData["phone"] = this.normalizePhone(dto.phone);
 
     // Merge metadata fields
     const metadataUpdates: Record<string, unknown> = {};
