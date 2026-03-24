@@ -228,11 +228,12 @@ export function createWebhookController(
     await whatsapp.sendText(phoneNumberId, customerPhone, replyText);
 
     // Detect email draft in tool results → send interactive buttons for HITL confirmation
+    // The agent's text reply already contains the full preview, so the button body
+    // is just a short action prompt to avoid duplicating the preview.
     const emailDraft = findEmailDraft(result);
     if (emailDraft) {
-      const { draftId, preview } = emailDraft;
-      const buttonBody = `📧 Para: ${preview.to}\n📋 Asunto: ${preview.subject}${preview.attachmentFilename ? `\n📎 Adjunto: ${preview.attachmentFilename}` : ""}`;
-      await whatsapp.sendInteractiveButtons(phoneNumberId, customerPhone, buttonBody, [
+      const { draftId } = emailDraft;
+      await whatsapp.sendInteractiveButtons(phoneNumberId, customerPhone, "¿Enviar este email?", [
         { id: `confirm_email:${draftId}`, title: "Enviar" },
         { id: `cancel_email:${draftId}`, title: "Cancelar" },
       ]);
