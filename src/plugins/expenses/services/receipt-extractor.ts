@@ -1,31 +1,28 @@
-import { generateText } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import type { MediaAttachment } from "../../../agent/types.js";
 import { logger } from "../../../shared/logger.js";
 
 /**
  * Strict schema for structured receipt extraction.
- * Used for validation AFTER text-based JSON extraction.
+ * Used for validation AFTER JSON extraction.
  */
 const ReceiptSchema = z.object({
-  vendor: z.string().describe("Nombre del proveedor exactamente como aparece en el ticket/factura. Si no es legible, devuelve cadena vacía."),
-  vendorCif: z.string().nullable().describe("CIF/NIF del proveedor si aparece, null si no."),
-  amount: z.number().describe("Importe TOTAL a pagar (con IVA incluido). 0 si no es legible."),
-  vatAmount: z.number().nullable().describe("Cuota de IVA en euros (NO el porcentaje). null si no aparece desglosado."),
-  vatRate: z.number().nullable().describe("Porcentaje de IVA (21, 10, 4). null si no aparece."),
-  date: z.string().describe("Fecha en formato YYYY-MM-DD. Cadena vacía si no es legible."),
-  concept: z.string().describe("Descripción breve del tipo de gasto basándote en los productos/servicios visibles."),
-  productsSummary: z.string().nullable().describe("Resumen de los productos/servicios principales del ticket."),
-  paymentMethod: z.string().nullable().describe("Método de pago si aparece (efectivo, tarjeta, etc)."),
-  confidence: z.enum(["high", "medium", "low"]).describe("Tu confianza general en la extracción: high si todo legible, medium si algunos campos borrosos, low si la imagen es muy mala."),
-  unreadableFields: z.array(z.string()).describe("Lista de campos que no pudiste leer. Array vacío si todo legible."),
+  vendor: z.string().default(""),
+  vendorCif: z.string().nullish().default(null),
+  amount: z.number().default(0),
+  vatAmount: z.number().nullish().default(null),
+  vatRate: z.number().nullish().default(null),
+  date: z.string().default(""),
+  concept: z.string().default(""),
+  productsSummary: z.string().nullish().default(null),
+  paymentMethod: z.string().nullish().default(null),
+  confidence: z.enum(["high", "medium", "low"]).default("medium"),
+  unreadableFields: z.array(z.string()).default([]),
 });
 
 export type ExtractedReceipt = z.infer<typeof ReceiptSchema>;
 
-/** Dedicated model for receipt extraction — Flash is fast, cheap, and good at OCR. */
-const EXTRACTION_MODEL = "gemini-2.5-flash";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 const EXTRACTION_PROMPT = `Analiza esta imagen de un ticket o factura española y extrae los datos en formato JSON.
 
@@ -43,8 +40,8 @@ Devuelve EXCLUSIVAMENTE un objeto JSON con esta estructura (sin markdown, sin te
   "vendor": "nombre del proveedor o cadena vacía",
   "vendorCif": "CIF/NIF o null",
   "amount": 0.00,
-  "vatAmount": 0.00 o null,
-  "vatRate": 21 o null,
+  "vatAmount": 0.00,
+  "vatRate": 21,
   "date": "YYYY-MM-DD o cadena vacía",
   "concept": "descripción breve",
   "productsSummary": "resumen de productos o null",
@@ -54,11 +51,10 @@ Devuelve EXCLUSIVAMENTE un objeto JSON con esta estructura (sin markdown, sin te
 }`;
 
 /**
- * Extract structured data from a receipt image using generateText + JSON parsing.
+ * Extract structured data from a receipt image.
  *
- * Uses generateText (NOT generateObject) because Gemini's structured output mode
- * (responseSchema) is unreliable with multimodal input — it often fails silently
- * or returns empty data when images are present.
+ * Calls the Gemini REST API DIRECTLY — no AI SDK, no provider abstraction.
+ * This eliminates all possible SDK conversion/normalization issues.
  *
  * Returns null if extraction fails entirely.
  */
@@ -75,40 +71,61 @@ export async function extractReceiptData(attachment: MediaAttachment): Promise<E
     return null;
   }
 
+  // Use the configured model or fall back to gemini-2.0-flash (widely available, fast, good at OCR)
+  const model = process.env["GEMINI_MODEL"] ?? "gemini-2.0-flash";
+  const base64Image = Buffer.from(attachment.data).toString("base64");
+
   logger.info(
-    { mimeType: attachment.mimeType, bytes: attachment.data.length, model: EXTRACTION_MODEL },
-    "Starting receipt extraction",
+    { mimeType: attachment.mimeType, bytes: attachment.data.length, base64Length: base64Image.length, model },
+    "Starting direct Gemini API receipt extraction",
   );
 
   try {
-    const google = createGoogleGenerativeAI({ apiKey });
+    const url = `${GEMINI_API_URL}/${model}:generateContent?key=${apiKey}`;
 
-    const result = await generateText({
-      model: google(EXTRACTION_MODEL),
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "file" as const,
-              data: attachment.data,
-              mediaType: attachment.mimeType,
+    const body = {
+      contents: [{
+        parts: [
+          {
+            inlineData: {
+              mimeType: attachment.mimeType,
+              data: base64Image,
             },
-            { type: "text" as const, text: EXTRACTION_PROMPT },
-          ],
-        },
-      ],
+          },
+          {
+            text: EXTRACTION_PROMPT,
+          },
+        ],
+      }],
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
+    };
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
 
-    const rawText = result.text?.trim();
-    if (!rawText) {
-      logger.warn("Receipt extraction returned empty text");
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      logger.error({ status: res.status, body: errText.slice(0, 500), model }, "Gemini API error in receipt extraction");
       return null;
     }
 
-    logger.debug({ rawText: rawText.slice(0, 500) }, "Raw extraction response");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await res.json() as any;
+    const rawText = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
-    // Strip markdown code fences if present (```json ... ```)
+    if (!rawText) {
+      logger.warn({ response: JSON.stringify(response).slice(0, 500) }, "Gemini returned no text in receipt extraction");
+      return null;
+    }
+
+    logger.info({ rawText: rawText.slice(0, 300) }, "Raw Gemini extraction response");
+
+    // Strip markdown code fences if present
     const jsonText = rawText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
 
     let parsed: unknown;
@@ -125,14 +142,21 @@ export async function extractReceiptData(attachment: MediaAttachment): Promise<E
       return null;
     }
 
+    const result = validated.data;
+
+    // Normalize vatRate: Gemini sometimes returns 0.10 instead of 10
+    if (result.vatRate != null && result.vatRate > 0 && result.vatRate < 1) {
+      result.vatRate = Math.round(result.vatRate * 100);
+    }
+
     logger.info(
-      { vendor: validated.data.vendor, amount: validated.data.amount, confidence: validated.data.confidence },
+      { vendor: result.vendor, amount: result.amount, confidence: result.confidence },
       "Receipt extraction succeeded",
     );
 
-    return validated.data;
+    return result;
   } catch (err) {
-    logger.error({ err }, "Receipt extraction failed");
+    logger.error({ err }, "Receipt extraction failed (exception)");
     return null;
   }
 }
