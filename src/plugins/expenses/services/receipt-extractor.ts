@@ -1,13 +1,12 @@
-import { generateObject } from "ai";
+import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import type { MediaAttachment } from "../../../agent/types.js";
-import { ragConfig } from "../../rag/config/rag.config.js";
 import { logger } from "../../../shared/logger.js";
 
 /**
  * Strict schema for structured receipt extraction.
- * generateObject forces Gemini to return ONLY these fields — no prose, no hallucination.
+ * Used for validation AFTER text-based JSON extraction.
  */
 const ReceiptSchema = z.object({
   vendor: z.string().describe("Nombre del proveedor exactamente como aparece en el ticket/factura. Si no es legible, devuelve cadena vacía."),
@@ -25,22 +24,43 @@ const ReceiptSchema = z.object({
 
 export type ExtractedReceipt = z.infer<typeof ReceiptSchema>;
 
-const EXTRACTION_PROMPT = `Extrae los datos de este ticket o factura española.
+/** Dedicated model for receipt extraction — Flash is fast, cheap, and good at OCR. */
+const EXTRACTION_MODEL = "gemini-2.5-flash";
+
+const EXTRACTION_PROMPT = `Analiza esta imagen de un ticket o factura española y extrae los datos en formato JSON.
 
 REGLAS ABSOLUTAS:
 - SOLO devuelve datos que puedas LEER CLARAMENTE en la imagen.
-- Si un campo no es legible o no aparece, usa el valor nulo/vacío del esquema.
+- Si un campo no es legible o no aparece, usa null o cadena vacía según corresponda.
 - NUNCA inventes, estimes ni adivines valores. Prefiere devolver null/vacío a inventar.
 - El campo "amount" es el TOTAL A PAGAR (última línea grande del ticket, incluye IVA).
 - El campo "vatAmount" es la CUOTA de IVA en euros, NO el porcentaje.
-- Si hay múltiples tipos de IVA (A, B, C), suma todas las cuotas.
-- La fecha debe ser exactamente como aparece, convertida a YYYY-MM-DD.`;
+- Si hay múltiples tipos de IVA, suma todas las cuotas.
+- La fecha debe ser exactamente como aparece, convertida a YYYY-MM-DD.
+
+Devuelve EXCLUSIVAMENTE un objeto JSON con esta estructura (sin markdown, sin texto adicional):
+{
+  "vendor": "nombre del proveedor o cadena vacía",
+  "vendorCif": "CIF/NIF o null",
+  "amount": 0.00,
+  "vatAmount": 0.00 o null,
+  "vatRate": 21 o null,
+  "date": "YYYY-MM-DD o cadena vacía",
+  "concept": "descripción breve",
+  "productsSummary": "resumen de productos o null",
+  "paymentMethod": "efectivo/tarjeta/null",
+  "confidence": "high|medium|low",
+  "unreadableFields": []
+}`;
 
 /**
- * Extract structured data from a receipt image using generateObject.
- * This is a dedicated extraction step (gather phase) — NOT a conversational call.
+ * Extract structured data from a receipt image using generateText + JSON parsing.
  *
- * Returns null if extraction fails entirely (no image, API error, etc).
+ * Uses generateText (NOT generateObject) because Gemini's structured output mode
+ * (responseSchema) is unreliable with multimodal input — it often fails silently
+ * or returns empty data when images are present.
+ *
+ * Returns null if extraction fails entirely.
  */
 export async function extractReceiptData(attachment: MediaAttachment): Promise<ExtractedReceipt | null> {
   const apiKey = process.env["GOOGLE_API_KEY"] ?? process.env["GOOGLE_GENERATIVE_AI_API_KEY"];
@@ -49,25 +69,69 @@ export async function extractReceiptData(attachment: MediaAttachment): Promise<E
     return null;
   }
 
+  // Validate image data
+  if (!attachment.data || attachment.data.length < 1000) {
+    logger.warn({ bytes: attachment.data?.length ?? 0 }, "Receipt image too small — likely corrupted");
+    return null;
+  }
+
+  logger.info(
+    { mimeType: attachment.mimeType, bytes: attachment.data.length, model: EXTRACTION_MODEL },
+    "Starting receipt extraction",
+  );
+
   try {
     const google = createGoogleGenerativeAI({ apiKey });
 
-    const result = await generateObject({
-      model: google(ragConfig.llmModel),
-      schema: ReceiptSchema,
+    const result = await generateText({
+      model: google(EXTRACTION_MODEL),
       messages: [
         {
           role: "user",
           content: [
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            { type: "image" as const, image: attachment.data, mimeType: attachment.mimeType } as any,
+            {
+              type: "image" as const,
+              image: attachment.data,
+              mimeType: attachment.mimeType,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any,
             { type: "text" as const, text: EXTRACTION_PROMPT },
           ],
         },
       ],
     });
 
-    return result.object;
+    const rawText = result.text?.trim();
+    if (!rawText) {
+      logger.warn("Receipt extraction returned empty text");
+      return null;
+    }
+
+    logger.debug({ rawText: rawText.slice(0, 500) }, "Raw extraction response");
+
+    // Strip markdown code fences if present (```json ... ```)
+    const jsonText = rawText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch (parseErr) {
+      logger.warn({ rawText: rawText.slice(0, 300), err: parseErr }, "Failed to parse extraction JSON");
+      return null;
+    }
+
+    const validated = ReceiptSchema.safeParse(parsed);
+    if (!validated.success) {
+      logger.warn({ errors: validated.error.issues, parsed }, "Extraction JSON failed schema validation");
+      return null;
+    }
+
+    logger.info(
+      { vendor: validated.data.vendor, amount: validated.data.amount, confidence: validated.data.confidence },
+      "Receipt extraction succeeded",
+    );
+
+    return validated.data;
   } catch (err) {
     logger.error({ err }, "Receipt extraction failed");
     return null;
