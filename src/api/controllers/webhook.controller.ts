@@ -7,6 +7,7 @@ import type { OrganizationRepository } from "../../domain/ports/repositories/org
 import type { UserRepository } from "../../domain/ports/repositories/user.repository.js";
 import type { WhatsAppChannel } from "../../domain/ports/whatsapp-channel.js";
 import type { AttachmentStore } from "../../domain/ports/attachment-store.js";
+import type { MediaAttachment } from "../../agent/types.js";
 import { createAgentContext } from "../../application/agent-context.js";
 import { loadConversationHistory } from "../../agent/load-history.js";
 import { loadMemoryContext } from "../../agent/load-memories.js";
@@ -18,6 +19,50 @@ import { takeDraft } from "../../plugins/gmail/services/draft-store.js";
 import { ragConfig } from "../../plugins/rag/config/rag.config.js";
 import type { GmailApiService } from "../../plugins/gmail/services/gmail-api.service.js";
 import type { MemoryManager } from "../../application/managers/memory.manager.js";
+
+const KAPSO_BASE = "https://api.kapso.ai/meta/whatsapp/v24.0";
+
+/**
+ * Download a media object from Kapso.
+ * Kapso mirrors the Meta Cloud API:
+ *   1. GET /{phoneNumberId}/media/{mediaId} → { url, mime_type }
+ *   2. GET {url} → binary
+ */
+async function downloadKapsoMedia(
+  phoneNumberId: string,
+  mediaId: string,
+  apiKey: string,
+): Promise<Uint8Array | null> {
+  try {
+    const metaRes = await fetch(`${KAPSO_BASE}/${phoneNumberId}/media/${mediaId}`, {
+      headers: { "X-API-Key": apiKey },
+    });
+    if (!metaRes.ok) {
+      logger.warn({ mediaId, status: metaRes.status }, "Kapso media info fetch failed");
+      return null;
+    }
+
+    const meta = await metaRes.json() as { url?: string };
+    if (!meta.url) {
+      logger.warn({ mediaId }, "Kapso media info missing url field");
+      return null;
+    }
+
+    const binaryRes = await fetch(meta.url, {
+      headers: { "X-API-Key": apiKey },
+    });
+    if (!binaryRes.ok) {
+      logger.warn({ mediaId, status: binaryRes.status }, "Kapso media binary download failed");
+      return null;
+    }
+
+    const buffer = await binaryRes.arrayBuffer();
+    return new Uint8Array(buffer);
+  } catch (err) {
+    logger.error({ err, mediaId }, "downloadKapsoMedia error");
+    return null;
+  }
+}
 
 // Dedup: track processed idempotency keys to avoid duplicate responses
 const processedKeys = new Map<string, number>();
@@ -104,14 +149,49 @@ export function createWebhookController(
         continue;
       }
 
+      // --- Extract message content (text, image, or document) ---
+      const msgType = message["type"] as string | undefined;
       const textObj = message["text"] as Record<string, unknown> | undefined;
-      const body = textObj?.["body"] as string | undefined;
-      if (!body) continue;
+      const imageObj = message["image"] as Record<string, unknown> | undefined;
+      const documentObj = message["document"] as Record<string, unknown> | undefined;
 
-      logger.info({ messageId, customerPhone, phoneNumberId, text: body.slice(0, 50) }, "Webhook processing message");
+      // Determine prompt text (caption for media, body for text)
+      let body: string | undefined;
+      let mediaInfo: { mediaId: string; mimeType: string; filename?: string } | undefined;
+
+      if (msgType === "text" || textObj) {
+        body = textObj?.["body"] as string | undefined;
+        if (!body) continue;
+      } else if (msgType === "image" || imageObj) {
+        const img = imageObj ?? (message["image"] as Record<string, unknown>);
+        const mediaId = img?.["id"] as string | undefined;
+        const mimeType = (img?.["mime_type"] as string | undefined) ?? "image/jpeg";
+        const caption = img?.["caption"] as string | undefined;
+        if (!mediaId) continue;
+        body = caption || "[El usuario envió una imagen]";
+        mediaInfo = { mediaId, mimeType };
+      } else if (msgType === "document" || documentObj) {
+        const doc = documentObj ?? (message["document"] as Record<string, unknown>);
+        const mediaId = doc?.["id"] as string | undefined;
+        const mimeType = (doc?.["mime_type"] as string | undefined) ?? "application/pdf";
+        const caption = doc?.["caption"] as string | undefined;
+        const filename = doc?.["filename"] as string | undefined;
+        if (!mediaId) continue;
+        body = caption || `[El usuario envió un documento${filename ? `: ${filename}` : ""}]`;
+        mediaInfo = filename ? { mediaId, mimeType, filename } : { mediaId, mimeType };
+      } else {
+        // Unsupported message type (voice, sticker, location, etc.) — skip silently
+        logger.debug({ msgType, messageId }, "Unsupported message type — skipping");
+        continue;
+      }
+
+      logger.info(
+        { messageId, customerPhone, phoneNumberId, msgType: msgType ?? "text", text: body.slice(0, 50) },
+        "Webhook processing message",
+      );
 
       // Fire and forget — respond 200 immediately, process in background
-      processMessage(body, messageId, phoneNumberId, customerPhone).catch((err) => {
+      processMessage(body, messageId, phoneNumberId, customerPhone, mediaInfo).catch((err) => {
         logger.error({ err, messageId }, "Webhook async processing error");
       });
     }
@@ -175,6 +255,7 @@ export function createWebhookController(
     messageId: string,
     phoneNumberId: string,
     customerPhone: string,
+    mediaInfo?: { mediaId: string; mimeType: string; filename?: string },
   ): Promise<void> {
     // Resolve user by their phone number
     const user = await userRepo.findByPhone(customerPhone);
@@ -191,6 +272,24 @@ export function createWebhookController(
     // Send typing indicator + mark as read (fire-and-forget, before agent processing)
     whatsapp.sendTypingIndicator(phoneNumberId, messageId).catch(() => {});
 
+    // Download media if present (image or document)
+    let attachments: MediaAttachment[] | undefined;
+    if (mediaInfo) {
+      const kapsoApiKey = process.env["KAPSO_API_KEY"] ?? "";
+      const data = await downloadKapsoMedia(phoneNumberId, mediaInfo.mediaId, kapsoApiKey);
+      if (data) {
+        const attachment: MediaAttachment = { data, mimeType: mediaInfo.mimeType };
+        if (mediaInfo.filename) attachment.filename = mediaInfo.filename;
+        attachments = [attachment];
+        logger.info(
+          { mediaId: mediaInfo.mediaId, mimeType: mediaInfo.mimeType, bytes: data.length },
+          "Media downloaded for multimodal processing",
+        );
+      } else {
+        logger.warn({ mediaId: mediaInfo.mediaId }, "Media download failed — processing text-only");
+      }
+    }
+
     // Resolve conversation
     const conversationId = await convManager.resolveOrCreateForChannel(
       `kapso:${customerPhone}`,
@@ -202,11 +301,12 @@ export function createWebhookController(
     const memoryMessages = await loadMemoryContext(memoryManager, orgId);
     const history = await loadConversationHistory(convManager, conversationId);
 
-    // Run agent
+    // Run agent (multimodal if attachments present)
     const result = await agent.generate({
       prompt: messageText,
       messages: [...memoryMessages, ...history],
       experimental_context,
+      ...(attachments ? { attachments } : {}),
     });
 
     const replyText = result.text?.trim();

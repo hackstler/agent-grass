@@ -1,6 +1,6 @@
 import { generateText, streamText, stepCountIs } from "ai";
 import type { LanguageModel, ModelMessage, ToolSet } from "ai";
-import type { AgentContext, AgentGenerateResult, AgentStreamResult } from "./types.js";
+import type { AgentContext, AgentGenerateResult, AgentStreamResult, MediaAttachment } from "./types.js";
 
 export interface AgentRunnerConfig {
   model: LanguageModel;
@@ -16,6 +16,8 @@ export interface GenerateOptions {
   maxSteps?: number;
   /** Override the agent's default tools for this call only (e.g., permission-wrapped tools). */
   tools?: ToolSet;
+  /** Multimodal attachments (images, PDFs) sent alongside the text prompt. */
+  attachments?: MediaAttachment[];
 }
 
 export interface StreamOptions {
@@ -43,11 +45,24 @@ export class AgentRunner {
   }
 
   async generate(opts: GenerateOptions): Promise<AgentGenerateResult> {
-    const { prompt, messages, experimental_context, maxSteps, tools: toolOverrides } = opts;
+    const { prompt, messages, experimental_context, maxSteps, tools: toolOverrides, attachments } = opts;
+
+    // Build user message — multimodal if attachments are present
+    const userContent = attachments?.length
+      ? [
+          ...attachments.map((a) =>
+            a.mimeType.startsWith("image/")
+              ? { type: "image" as const, image: a.data, mimeType: a.mimeType }
+              : { type: "file" as const, data: a.data, mediaType: a.mimeType },
+          ),
+          { type: "text" as const, text: prompt },
+        ]
+      : prompt;
 
     const allMessages: ModelMessage[] = [
       ...(messages ?? []),
-      { role: "user" as const, content: prompt },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { role: "user" as const, content: userContent as any },
     ];
 
     const system = typeof this.config.system === "function" ? this.config.system() : this.config.system;

@@ -51,3 +51,16 @@ export interface AgentStreamChunk {
 export interface AgentStreamResult {
   readonly fullStream: AsyncIterable<AgentStreamChunk>;
 }
+
+/**
+ * A media attachment (image or document) to include alongside a text prompt.
+ * Used for multimodal inputs — e.g., a WhatsApp photo of a receipt.
+ */
+export interface MediaAttachment {
+  /** Raw binary content. */
+  data: Uint8Array;
+  /** MIME type, e.g. "image/jpeg", "application/pdf". */
+  mimeType: string;
+  /** Original filename (optional, for documents). */
+  filename?: string;
+}
