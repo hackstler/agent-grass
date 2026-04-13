@@ -25,7 +25,6 @@ import type { MemoryManager } from "../../application/managers/memory.manager.js
 const KAPSO_BASE = "https://api.kapso.ai/meta/whatsapp/v24.0";
 
 /**
-/**
  * Download media from Kapso's WhatsApp API (two-step flow).
  *
  * Step 1: GET /{mediaId}?phone_number_id={phoneNumberId} → { url, download_url, mime_type }
