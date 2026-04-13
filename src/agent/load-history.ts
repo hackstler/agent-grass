@@ -10,10 +10,16 @@ import { ragConfig } from "../plugins/rag/config/rag.config.js";
 const SESSION_GAP_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 /** Max number of old sessions to include as compacted summaries. */
-const MAX_OLD_SESSIONS = 3;
+const MAX_OLD_SESSIONS = 2;
 
 /** Max chars of user message content to include in compacted summaries. */
-const USER_MSG_TRUNCATE = 80;
+const USER_MSG_TRUNCATE = 60;
+
+/**
+ * Trivial messages (greetings, thanks, etc.) that don't need any old session context.
+ * If the current prompt matches, skip loading old sessions entirely.
+ */
+const TRIVIAL_PATTERN = /^(hol[ai]?|hey|buenas?|buenos?\s*d[ií]as?|qu[eé]\s*tal|gracias|thank|adi[oó]s|hasta\s*luego|ok|vale|sí|si|no|dale|claro)\b/i;
 
 /** A message with the fields we need from the DB. */
 type HistoryMessage = Pick<Message, "id" | "role" | "content" | "metadata" | "createdAt">;
@@ -33,13 +39,11 @@ interface Session {
  *
  * 1. Split all messages into "sessions" based on time gaps (>2h = new session)
  * 2. **Current session** (the most recent): load messages in FULL
- * 3. **Previous sessions**: compact into brief summaries using persisted toolCalls metadata
- *    - Only user messages are included (truncated to 80 chars)
- *    - Assistant messages are replaced by their tool summaries
- *    - Max 3 previous sessions are included
- *
- * This prevents the LLM from confusing old context with the current request,
- * which was causing action contamination in long-lived WhatsApp conversations.
+ * 3. **Previous sessions**: compact into a SINGLE brief context line
+ *    - NO tool summaries (they cause re-execution contamination)
+ *    - Only a high-level topic hint per session
+ *    - Max 2 previous sessions
+ * 4. **Trivial messages** (greetings): skip old sessions entirely
  *
  * Default window size comes from ragConfig.windowSize (currently 10).
  */
@@ -68,34 +72,32 @@ export async function loadConversationHistory(
 
     // Multiple sessions — compact old ones, keep current one full
     const currentSession = sessions[sessions.length - 1]!;
-    const oldSessions = sessions.slice(0, -1).slice(-MAX_OLD_SESSIONS); // last N old sessions
+
+    // Check if current message is trivial (greeting/thanks) — skip old context entirely
+    const lastUserMsg = [...currentSession.messages].reverse().find((m) => m.role === "user");
+    const isTrivial = lastUserMsg && TRIVIAL_PATTERN.test(lastUserMsg.content.trim());
 
     const result: ModelMessage[] = [];
 
-    // 1. Compact old sessions into brief summaries
-    for (const session of oldSessions) {
-      const summary = compactSession(session);
-      if (summary) {
+    // 1. Include old sessions ONLY if the current message is non-trivial
+    if (!isTrivial) {
+      const oldSessions = sessions.slice(0, -1).slice(-MAX_OLD_SESSIONS);
+      const oldSummaries = oldSessions
+        .map((s) => compactSession(s))
+        .filter(Boolean);
+
+      if (oldSummaries.length > 0) {
         result.push({
           role: "system" as const,
-          content: summary,
+          content: `== CONTEXTO DE SESIONES ANTERIORES (solo referencia, NO re-ejecutar) ==\n${oldSummaries.join("\n")}`,
         });
       }
     }
 
     // 2. Add session boundary marker
-    const currentStart = currentSession.startedAt;
-    const date = currentStart.toLocaleDateString("es-ES", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "Europe/Madrid",
-    });
     result.push({
       role: "system" as const,
-      content: `--- Sesión actual (${date}) — responde SOLO al último mensaje del usuario ---`,
+      content: `--- SESIÓN ACTUAL — responde SOLO al último mensaje del usuario. NO repitas acciones de sesiones anteriores. ---`,
     });
 
     // 3. Load current session messages in full (capped by windowSize)
@@ -146,60 +148,36 @@ function splitIntoSessions(messages: HistoryMessage[]): Session[] {
 }
 
 /**
- * Compact an old session into a brief summary string.
+ * Compact an old session into a single-line topic summary.
  *
- * Format:
- * ```
- * [Sesión anterior — lunes, 25 de marzo, 11:03]
- * - Usuario: "vale toma nota de lo que son las traviesas, basicamente un tipo de d..."
- * - → Nota guardada
- * - Usuario: "necesito un presupuesto para Carlos Ruiz..."
- * - → Presupuesto: quote_carlos_ruiz.pdf
- * ```
+ * CRITICAL: Do NOT include tool action summaries (like "Nota guardada", "Presupuesto generado").
+ * Including them causes the LLM to re-execute those actions in the current session.
  *
- * Rules:
- * - User messages: truncated to USER_MSG_TRUNCATE chars
- * - Assistant messages: replaced by tool summaries only (no full text)
- * - System messages: omitted entirely
+ * Instead, extract only the TOPICS discussed from user messages.
+ *
+ * Format: "25 mar: traviesas, presupuesto Carlos Ruiz, enlace YouTube"
  */
 function compactSession(session: Session): string | null {
-  const lines: string[] = [];
-
-  const date = session.startedAt.toLocaleDateString("es-ES", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Madrid",
-  });
-
-  lines.push(`[Sesión anterior — ${date}]`);
-
-  let hasContent = false;
+  const userTopics: string[] = [];
 
   for (const m of session.messages) {
     if (m.role === "user") {
       const truncated = m.content.length > USER_MSG_TRUNCATE
-        ? m.content.slice(0, USER_MSG_TRUNCATE) + "..."
-        : m.content;
-      lines.push(`- Usuario: "${truncated}"`);
-      hasContent = true;
-    } else if (m.role === "assistant") {
-      // Only include tool summaries, skip the full assistant text
-      const toolCalls = m.metadata?.toolCalls;
-      if (toolCalls?.length) {
-        for (const tc of toolCalls) {
-          lines.push(`- → ${tc.summary}`);
-        }
-        hasContent = true;
-      }
-      // If no tool calls, omit the assistant message entirely
+        ? m.content.slice(0, USER_MSG_TRUNCATE).trim() + "…"
+        : m.content.trim();
+      userTopics.push(truncated);
     }
-    // System messages: omitted
   }
 
-  return hasContent ? lines.join("\n") : null;
+  if (userTopics.length === 0) return null;
+
+  const date = session.startedAt.toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Madrid",
+  });
+
+  return `- ${date}: ${userTopics.join(" | ")}`;
 }
 
 /**
