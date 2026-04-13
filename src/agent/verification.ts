@@ -61,6 +61,13 @@ const verificationRules: Record<string, VerificationRule> = {
         return { valid: false, reason: `Importe sospechoso (${amount}€). Verifica con el usuario.` };
       }
     }
+    const driveResult = result.toolResults.find((t) => t.toolName === "uploadReceiptToDrive");
+    if (driveResult) {
+      const r = driveResult.result as Record<string, unknown> | undefined;
+      if (r?.["success"] === true && !r?.["fileId"]) {
+        return { valid: false, reason: "La subida a Drive reportó éxito pero no devolvió fileId." };
+      }
+    }
     return { valid: true };
   },
 
