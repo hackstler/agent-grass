@@ -34,6 +34,7 @@ import { GmailPlugin } from "./plugins/gmail/index.js";
 import { CalendarPlugin } from "./plugins/calendar/index.js";
 import { QuotePlugin } from "./plugins/quote/index.js";
 import { CatalogManagerPlugin } from "./plugins/catalog-manager/index.js";
+import { ExpensesPlugin } from "./plugins/expenses/expenses.plugin.js";
 import { OAuthManagerAdapter } from "./plugins/google-common/oauth-manager-adapter.js";
 
 // Shared stores
@@ -43,6 +44,9 @@ import { PersistentAttachmentStore } from "./infrastructure/stores/persistent-at
 // Memory
 import { DrizzleMemoryRepository } from "./infrastructure/repositories/drizzle-memory.repository.js";
 import { MemoryManager } from "./application/managers/memory.manager.js";
+
+// Expenses
+import { DrizzleExpenseRepository } from "./infrastructure/repositories/drizzle-expense.repository.js";
 
 // Coordinator agent
 import { createCoordinatorAgent } from "./agent/coordinator.js";
@@ -88,6 +92,7 @@ const tokenEncryption = new AesTokenEncryption();
 const oauthManager = new OAuthManager(oauthTokenRepo, tokenEncryption);
 const memoryRepo = new DrizzleMemoryRepository();
 const memoryManager = new MemoryManager(memoryRepo);
+const expenseRepo = new DrizzleExpenseRepository();
 
 // 4. Plugin registry
 const pluginRegistry = new PluginRegistry();
@@ -102,6 +107,7 @@ pluginRegistry.register(gmailPlugin);
 pluginRegistry.register(new CalendarPlugin(oauthProvider));
 pluginRegistry.register(new QuotePlugin({ attachmentStore, organizationRepo: orgRepo, quoteRepo }));
 pluginRegistry.register(new CatalogManagerPlugin({ catalogManager, catalogRepo }));
+pluginRegistry.register(new ExpensesPlugin({ expenseRepo }));
 
 // 5. Coordinator agent (uses all plugin tools + conversation history + memory for sub-agents)
 const coordinatorAgent = createCoordinatorAgent(pluginRegistry, convManager, memoryManager);

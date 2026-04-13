@@ -85,6 +85,20 @@ export function summarizeToolCall(tr: AgentToolResult): string {
     }
     case "deleteMemory":
       return "Memoria eliminada";
+    case "recordExpense": {
+      const vendor = r?.["vendor"] as string | undefined;
+      const amount = r?.["amount"] as number | undefined;
+      return vendor ? `Gasto guardado: ${vendor} ${amount ? `${amount}€` : ""}` : "Gasto guardado";
+    }
+    case "listExpenses": {
+      const count = (r?.["count"] as number) ?? 0;
+      return `Gastos: ${count} registro${count !== 1 ? "s" : ""}`;
+    }
+    case "getExpenseSummary": {
+      const total = r?.["totalAmount"] as number | undefined;
+      const period = r?.["period"] as string | undefined;
+      return `Resumen${period ? ` ${period}` : ""}: ${total != null ? `${total}€` : ""}`;
+    }
     default:
       return tr.toolName;
   }
