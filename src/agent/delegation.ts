@@ -1,10 +1,11 @@
 import { tool } from "ai";
 import { z } from "zod";
-import type { AgentTools, DelegationResult } from "./types.js";
+import type { AgentTools, DelegationResult, MediaAttachment } from "./types.js";
 import type { Plugin } from "../plugins/plugin.interface.js";
 import { getAgentContextValue } from "../application/agent-context.js";
 import { loadConversationHistory } from "./load-history.js";
 import { takePendingMedia } from "./pending-media.js";
+import { extractReceiptData, validateExtraction, formatExtractionForAgent } from "../plugins/expenses/services/receipt-extractor.js";
 import type { ConversationManager } from "../application/managers/conversation.manager.js";
 import { ragConfig } from "../plugins/rag/config/rag.config.js";
 import { logger } from "../shared/logger.js";
@@ -91,8 +92,28 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager) 
           : [];
 
         // Forward any pending media attachments (images/docs from this request)
-        const attachments = conversationId ? takePendingMedia(conversationId) : undefined;
-        if (attachments?.length) {
+        let attachments: MediaAttachment[] | undefined = conversationId
+          ? takePendingMedia(conversationId)
+          : undefined;
+
+        // ── Gather phase: structured extraction for expenses with images ────
+        // Uses generateObject (schema-constrained) instead of free-form LLM prose.
+        // The conversational agent then handles confirmation, NOT extraction.
+        if (plugin.id === "expenses" && attachments?.length) {
+          logger.info({ mediaCount: attachments.length }, "Running structured receipt extraction");
+          const extracted = await extractReceiptData(attachments[0]!);
+          if (extracted) {
+            const issues = validateExtraction(extracted);
+            const enrichedQuery = formatExtractionForAgent(extracted, issues);
+            query = enrichedQuery;
+            // Don't forward the raw image — extraction is done
+            attachments = undefined;
+            logger.info({ vendor: extracted.vendor, amount: extracted.amount, confidence: extracted.confidence, issues }, "Receipt extraction complete");
+          } else {
+            query = "No se pudo analizar la imagen. Dile al usuario que la imagen no es legible y que la envíe de nuevo.";
+            attachments = undefined;
+          }
+        } else if (attachments?.length) {
           logger.info({ pluginId: plugin.id, mediaCount: attachments.length }, "Forwarding media to sub-agent");
         }
 

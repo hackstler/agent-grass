@@ -49,6 +49,21 @@ const verificationRules: Record<string, VerificationRule> = {
     return { valid: true };
   },
 
+  expenses: (result) => {
+    const recordResult = result.toolResults.find((t) => t.toolName === "recordExpense");
+    if (recordResult) {
+      const r = recordResult.result as Record<string, unknown> | undefined;
+      if (!r?.["expenseId"]) {
+        return { valid: false, reason: "El gasto no se guardó correctamente." };
+      }
+      const amount = r?.["amount"] as number | undefined;
+      if (amount != null && (amount <= 0 || amount > 50000)) {
+        return { valid: false, reason: `Importe sospechoso (${amount}€). Verifica con el usuario.` };
+      }
+    }
+    return { valid: true };
+  },
+
   rag: (result) => {
     // Verify minimum response length for non-trivial queries
     if (result.text && result.text.length < 10 && result.toolResults.length > 0) {
