@@ -48,13 +48,15 @@ export class AgentRunner {
     const { prompt, messages, experimental_context, maxSteps, tools: toolOverrides, attachments } = opts;
 
     // Build user message — multimodal if attachments are present
+    // IMPORTANT: @ai-sdk/google only handles "text" and "file" part types.
+    // "image" parts are silently dropped by the provider. Always use "file" with mediaType.
     const userContent = attachments?.length
       ? [
-          ...attachments.map((a) =>
-            a.mimeType.startsWith("image/")
-              ? { type: "image" as const, image: a.data, mimeType: a.mimeType }
-              : { type: "file" as const, data: a.data, mediaType: a.mimeType },
-          ),
+          ...attachments.map((a) => ({
+            type: "file" as const,
+            data: a.data,
+            mediaType: a.mimeType,
+          })),
           { type: "text" as const, text: prompt },
         ]
       : prompt;

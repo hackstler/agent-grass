@@ -90,11 +90,10 @@ export async function extractReceiptData(attachment: MediaAttachment): Promise<E
           role: "user",
           content: [
             {
-              type: "image" as const,
-              image: attachment.data,
-              mimeType: attachment.mimeType,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any,
+              type: "file" as const,
+              data: attachment.data,
+              mediaType: attachment.mimeType,
+            },
             { type: "text" as const, text: EXTRACTION_PROMPT },
           ],
         },
