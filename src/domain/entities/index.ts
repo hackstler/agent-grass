@@ -467,3 +467,37 @@ export interface NewCatalogItem {
   isActive?: boolean | undefined;
   createdAt?: Date | undefined;
 }
+
+// ── Expense ──────────────────────────────────────────────────────────────────
+
+export interface Expense {
+  id: string;
+  orgId: string;
+  userId: string;
+  vendor: string;
+  amount: number;          // total con IVA — number en dominio, string en DB (numeric)
+  vatAmount: number | null;
+  concept: string | null;
+  date: string;            // YYYY-MM-DD
+  receiptAttachmentId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NewExpense {
+  orgId: string;
+  userId: string;
+  vendor: string;
+  amount: number;
+  vatAmount?: number;
+  concept?: string;
+  date: string;            // YYYY-MM-DD
+  receiptAttachmentId?: string;
+}
+
+export interface ExpenseSummary {
+  totalAmount: number;
+  totalVat: number;
+  count: number;
+  byVendor: { vendor: string; total: number; count: number }[];
+}

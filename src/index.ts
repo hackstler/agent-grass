@@ -47,6 +47,7 @@ import { MemoryManager } from "./application/managers/memory.manager.js";
 
 // Expenses
 import { DrizzleExpenseRepository } from "./infrastructure/repositories/drizzle-expense.repository.js";
+import { ExpenseManager } from "./application/managers/expense.manager.js";
 
 // Coordinator agent
 import { createCoordinatorAgent } from "./agent/coordinator.js";
@@ -93,6 +94,7 @@ const oauthManager = new OAuthManager(oauthTokenRepo, tokenEncryption);
 const memoryRepo = new DrizzleMemoryRepository();
 const memoryManager = new MemoryManager(memoryRepo);
 const expenseRepo = new DrizzleExpenseRepository();
+const expenseManager = new ExpenseManager(expenseRepo);
 
 // 4. Plugin registry
 const pluginRegistry = new PluginRegistry();
@@ -107,7 +109,7 @@ pluginRegistry.register(gmailPlugin);
 pluginRegistry.register(new CalendarPlugin(oauthProvider));
 pluginRegistry.register(new QuotePlugin({ attachmentStore, organizationRepo: orgRepo, quoteRepo }));
 pluginRegistry.register(new CatalogManagerPlugin({ catalogManager, catalogRepo }));
-pluginRegistry.register(new ExpensesPlugin({ expenseRepo }));
+pluginRegistry.register(new ExpensesPlugin({ expenseManager }));
 
 // 5. Coordinator agent (uses all plugin tools + conversation history + memory for sub-agents)
 const coordinatorAgent = createCoordinatorAgent(pluginRegistry, convManager, memoryManager);
