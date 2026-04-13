@@ -26,8 +26,9 @@ const KAPSO_BASE = "https://api.kapso.ai/meta/whatsapp/v24.0";
 
 /**
  * Download a media object from Kapso.
- * Kapso mirrors the Meta Cloud API:
- *   1. GET /{phoneNumberId}/media/{mediaId} → { url, mime_type }
+ *
+ * Meta Cloud API media retrieval:
+ *   1. GET /{mediaId} → { url, mime_type }  (media ID directly, NOT under phoneNumberId)
  *   2. GET {url} → binary
  */
 async function downloadKapsoMedia(
@@ -36,32 +37,45 @@ async function downloadKapsoMedia(
   apiKey: string,
 ): Promise<Uint8Array | null> {
   try {
-    const metaRes = await fetch(`${KAPSO_BASE}/${phoneNumberId}/media/${mediaId}`, {
+    // Meta-style: GET /{mediaId} — the media ID is a top-level resource
+    const infoUrl = `${KAPSO_BASE}/${mediaId}`;
+    logger.info({ infoUrl, mediaId, phoneNumberId }, "Kapso: fetching media info");
+
+    const metaRes = await fetch(infoUrl, {
       headers: { "X-API-Key": apiKey },
     });
+
     if (!metaRes.ok) {
-      logger.warn({ mediaId, status: metaRes.status }, "Kapso media info fetch failed");
+      const errBody = await metaRes.text().catch(() => "");
+      logger.error({ mediaId, status: metaRes.status, url: infoUrl, body: errBody.slice(0, 300) }, "Kapso media info fetch failed");
       return null;
     }
 
-    const meta = await metaRes.json() as { url?: string };
-    if (!meta.url) {
-      logger.warn({ mediaId }, "Kapso media info missing url field");
+    const meta = await metaRes.json() as Record<string, unknown>;
+    logger.info({ mediaId, metaKeys: Object.keys(meta), url: meta["url"] ? "present" : "missing" }, "Kapso media info response");
+
+    const downloadUrl = meta["url"] as string | undefined;
+    if (!downloadUrl) {
+      logger.error({ mediaId, meta: JSON.stringify(meta).slice(0, 300) }, "Kapso media info missing url field");
       return null;
     }
 
-    const binaryRes = await fetch(meta.url, {
+    logger.info({ mediaId, downloadUrl: downloadUrl.slice(0, 100) }, "Kapso: downloading binary");
+
+    const binaryRes = await fetch(downloadUrl, {
       headers: { "X-API-Key": apiKey },
     });
     if (!binaryRes.ok) {
-      logger.warn({ mediaId, status: binaryRes.status }, "Kapso media binary download failed");
+      const errBody = await binaryRes.text().catch(() => "");
+      logger.error({ mediaId, status: binaryRes.status, body: errBody.slice(0, 300) }, "Kapso media binary download failed");
       return null;
     }
 
     const buffer = await binaryRes.arrayBuffer();
+    logger.info({ mediaId, bytes: buffer.byteLength }, "Kapso media binary downloaded");
     return new Uint8Array(buffer);
   } catch (err) {
-    logger.error({ err, mediaId }, "downloadKapsoMedia error");
+    logger.error({ err, mediaId }, "downloadKapsoMedia exception");
     return null;
   }
 }
