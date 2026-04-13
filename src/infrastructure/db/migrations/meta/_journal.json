@@ -148,6 +148,13 @@
       "when": 1775487866377,
       "tag": "0020_add-agent-memories",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1776093360254,
+      "tag": "0021_add-expenses",
+      "breakpoints": true
     }
   ]
 }

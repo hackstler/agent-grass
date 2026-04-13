@@ -536,3 +536,36 @@ export type AttachmentRow = typeof attachments.$inferSelect;
 export type NewAttachmentRow = typeof attachments.$inferInsert;
 export type AgentMemoryRow = typeof agentMemories.$inferSelect;
 export type NewAgentMemoryRow = typeof agentMemories.$inferInsert;
+
+// ── Expenses (gastos de autónomos) ────────────────────────────────────────────
+export const expenses = pgTable(
+  "expenses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: text("org_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    vendor: text("vendor").notNull(),
+    amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),   // total con IVA
+    vatAmount: numeric("vat_amount", { precision: 10, scale: 2 }),      // importe IVA (nullable)
+    concept: text("concept"),
+    date: text("date").notNull(),                                        // ISO 8601: YYYY-MM-DD
+    receiptAttachmentId: uuid("receipt_attachment_id")
+      .references(() => attachments.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    orgDateIdx: index("expenses_org_date_idx").on(table.orgId, table.date),
+    userIdx: index("expenses_user_id_idx").on(table.userId),
+  })
+);
+
+export const expensesRelations = relations(expenses, ({ one }) => ({
+  user: one(users, { fields: [expenses.userId], references: [users.id] }),
+  receiptAttachment: one(attachments, { fields: [expenses.receiptAttachmentId], references: [attachments.id] }),
+}));
+
+export type ExpenseRow = typeof expenses.$inferSelect;
+export type NewExpenseRow = typeof expenses.$inferInsert;
