@@ -96,11 +96,16 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager) 
           ? takePendingMedia(conversationId)
           : undefined;
 
+        logger.info(
+          { pluginId: plugin.id, conversationId: conversationId ?? "NONE", hasMedia: !!attachments, mediaCount: attachments?.length ?? 0 },
+          "Delegation: pending media check",
+        );
+
         // ── Gather phase: structured extraction for expenses with images ────
-        // Uses generateObject (schema-constrained) instead of free-form LLM prose.
-        // The conversational agent then handles confirmation, NOT extraction.
+        // Note: For WhatsApp, extraction now happens at the webhook level (before agents).
+        // This path is a fallback for other channels or if webhook extraction was skipped.
         if (plugin.id === "expenses" && attachments?.length) {
-          logger.info({ mediaCount: attachments.length }, "Running structured receipt extraction");
+          logger.info({ mediaCount: attachments.length, bytes: attachments[0]!.data.length }, "Running receipt extraction in delegation (fallback)");
           const extracted = await extractReceiptData(attachments[0]!);
           if (extracted) {
             const issues = validateExtraction(extracted);

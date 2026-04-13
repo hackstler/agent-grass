@@ -9,6 +9,7 @@ import type { WhatsAppChannel } from "../../domain/ports/whatsapp-channel.js";
 import type { AttachmentStore } from "../../domain/ports/attachment-store.js";
 import type { MediaAttachment } from "../../agent/types.js";
 import { storePendingMedia } from "../../agent/pending-media.js";
+import { extractReceiptData, validateExtraction, formatExtractionForAgent } from "../../plugins/expenses/services/receipt-extractor.js";
 import { createAgentContext } from "../../application/agent-context.js";
 import { loadConversationHistory } from "../../agent/load-history.js";
 import { loadMemoryContext } from "../../agent/load-memories.js";
@@ -302,12 +303,31 @@ export function createWebhookController(
     const memoryMessages = await loadMemoryContext(memoryManager, orgId);
     const history = await loadConversationHistory(convManager, conversationId);
 
-    // Store attachments so delegation tools can forward them to sub-agents
-    if (attachments) {
+    // ── Receipt extraction at the entry point (before agents) ──────────────
+    // Extract receipt data DIRECTLY here instead of relying on the delegation
+    // pipeline (pending-media → coordinator → delegation → extraction).
+    // This guarantees the image data is available for extraction.
+    if (attachments?.length && attachments[0]!.mimeType.startsWith("image/")) {
+      logger.info({ bytes: attachments[0]!.data.length, mimeType: attachments[0]!.mimeType }, "Attempting receipt extraction at webhook level");
+      const extracted = await extractReceiptData(attachments[0]!);
+      if (extracted) {
+        const issues = validateExtraction(extracted);
+        messageText = formatExtractionForAgent(extracted, issues);
+        logger.info({ vendor: extracted.vendor, amount: extracted.amount }, "Receipt extracted at webhook — enriching query");
+        // Store media for Drive upload tool
+        storePendingMedia(conversationId, attachments);
+        attachments = undefined; // Don't pass raw image — extraction done
+      } else {
+        logger.warn("Receipt extraction failed at webhook level — passing image to agents");
+        // Fall through: store media and pass image to coordinator as before
+        storePendingMedia(conversationId, attachments);
+      }
+    } else if (attachments) {
+      // Non-image attachments (PDFs, docs) — store for delegation
       storePendingMedia(conversationId, attachments);
     }
 
-    // Run agent (multimodal if attachments present)
+    // Run agent (multimodal if attachments still present, text-only if extraction succeeded)
     const result = await agent.generate({
       prompt: messageText,
       messages: [...memoryMessages, ...history],
