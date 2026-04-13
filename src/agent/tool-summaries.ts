@@ -99,6 +99,10 @@ export function summarizeToolCall(tr: AgentToolResult): string {
       const period = r?.["period"] as string | undefined;
       return `Resumen${period ? ` ${period}` : ""}: ${total != null ? `${total}€` : ""}`;
     }
+    case "uploadReceiptToDrive": {
+      const folder = r?.["folderPath"] as string | undefined;
+      return folder ? `Comprobante subido a Drive: ${folder}` : "Comprobante subido a Drive";
+    }
     default:
       return tr.toolName;
   }

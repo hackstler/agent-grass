@@ -43,6 +43,10 @@ const defaultPermissions: Record<string, ToolPermission> = {
   recallMemory: { level: "auto" },
   saveMemory: { level: "auto" },
   deleteMemory: { level: "auto" },
+  listExpenses: { level: "auto" },
+  getExpenseSummary: { level: "auto" },
+  recordExpense: { level: "auto" },
+  uploadReceiptToDrive: { level: "auto" },
 
   // ── Confirm (needs user approval) ────────────────────────────────────────
   // Note: sendEmail already uses the draft+UI-confirm pattern,

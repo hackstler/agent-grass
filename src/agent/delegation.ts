@@ -4,7 +4,7 @@ import type { AgentTools, DelegationResult, MediaAttachment } from "./types.js";
 import type { Plugin } from "../plugins/plugin.interface.js";
 import { getAgentContextValue } from "../application/agent-context.js";
 import { loadConversationHistory } from "./load-history.js";
-import { takePendingMedia } from "./pending-media.js";
+import { takePendingMedia, storePendingMedia } from "./pending-media.js";
 import { extractReceiptData, validateExtraction, formatExtractionForAgent } from "../plugins/expenses/services/receipt-extractor.js";
 import type { ConversationManager } from "../application/managers/conversation.manager.js";
 import { ragConfig } from "../plugins/rag/config/rag.config.js";
@@ -106,8 +106,9 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager) 
             const issues = validateExtraction(extracted);
             const enrichedQuery = formatExtractionForAgent(extracted, issues);
             query = enrichedQuery;
-            // Don't forward the raw image — extraction is done
-            attachments = undefined;
+            // Re-store media so tools (e.g. uploadReceiptToDrive) can still access it
+            if (conversationId) storePendingMedia(conversationId, attachments);
+            attachments = undefined; // don't pass raw image to the conversational agent
             logger.info({ vendor: extracted.vendor, amount: extracted.amount, confidence: extracted.confidence, issues }, "Receipt extraction complete");
           } else {
             query = "No se pudo analizar la imagen. Dile al usuario que la imagen no es legible y que la envíe de nuevo.";
