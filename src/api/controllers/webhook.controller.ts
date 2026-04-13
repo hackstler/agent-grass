@@ -290,8 +290,6 @@ export function createWebhookController(
 
     // Download media if present (image or document)
     let attachments: MediaAttachment[] | undefined;
-    // Track diagnostic info for debugging image processing failures
-    let mediaDiagnostic = "";
 
     if (mediaInfo) {
       const kapsoApiKey = process.env["KAPSO_API_KEY"] ?? "";
@@ -306,8 +304,7 @@ export function createWebhookController(
           "Media downloaded for multimodal processing",
         );
       } else {
-        mediaDiagnostic = "[DIAG:DOWNLOAD_FAILED]";
-        logger.error({ mediaId: mediaInfo.mediaId, phoneNumberId }, "CRITICAL: Media download failed — image lost");
+        logger.error({ mediaId: mediaInfo.mediaId, phoneNumberId }, "Media download failed — processing text-only");
       }
     }
 
@@ -333,21 +330,11 @@ export function createWebhookController(
         storePendingMedia(conversationId, attachments);
         attachments = undefined;
       } else {
-        mediaDiagnostic = "[DIAG:EXTRACTION_FAILED]";
-        logger.error("CRITICAL: Receipt extraction returned null despite having image data");
+        logger.warn("Receipt extraction returned null — forwarding image to agent as-is");
         storePendingMedia(conversationId, attachments);
       }
     } else if (attachments) {
       storePendingMedia(conversationId, attachments);
-    } else if (mediaInfo && !attachments) {
-      // mediaInfo exists but download failed — no diagnostic tag set yet means old code path
-      if (!mediaDiagnostic) mediaDiagnostic = "[DIAG:NO_ATTACHMENTS]";
-    }
-
-    // Append diagnostic tag to messageText so we can see it in the agent response
-    if (mediaDiagnostic) {
-      messageText = `${messageText} ${mediaDiagnostic}`;
-      logger.error({ diagnostic: mediaDiagnostic, messageText }, "Image processing failed — diagnostic tag added");
     }
 
     // Run agent (multimodal if attachments still present, text-only if extraction succeeded)

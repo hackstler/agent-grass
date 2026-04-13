@@ -5,8 +5,6 @@ import { checkDbConnection } from "../infrastructure/db/client.js";
 let gitCommit = "unknown";
 try { gitCommit = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim(); } catch { /* not a git repo in production */ }
 
-const DEPLOY_MARKER = `direct-gemini-${Date.now()}`;
-
 const health = new Hono();
 
 health.get("/", async (c) => {
@@ -24,7 +22,6 @@ health.get("/", async (c) => {
       },
       version: "0.1.0",
       commit: gitCommit,
-      deployMarker: DEPLOY_MARKER,
     },
     httpStatus
   );
