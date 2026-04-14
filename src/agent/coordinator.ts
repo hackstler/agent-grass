@@ -3,6 +3,7 @@ import { AgentRunner } from "./agent-runner.js";
 import type { PluginRegistry } from "../plugins/plugin-registry.js";
 import type { ConversationManager } from "../application/managers/conversation.manager.js";
 import type { MemoryManager } from "../application/managers/memory.manager.js";
+import type { AttachmentStore } from "../domain/ports/attachment-store.js";
 import { ragConfig } from "../plugins/rag/config/rag.config.js";
 import { getTemporalContext } from "./temporal-context.js";
 import { createMemoryTools } from "./memory-tools.js";
@@ -15,8 +16,9 @@ export function createCoordinatorAgent(
   registry: PluginRegistry,
   convManager: ConversationManager,
   memoryManager?: MemoryManager,
+  attachmentStore?: AttachmentStore,
 ): AgentRunner {
-  const delegationTools = registry.getDelegationTools(convManager);
+  const delegationTools = registry.getDelegationTools(convManager, attachmentStore);
   const memoryTools = memoryManager ? createMemoryTools(memoryManager) : {};
   const tools = { ...delegationTools, ...memoryTools };
 

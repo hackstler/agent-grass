@@ -8,7 +8,6 @@ import type { UserRepository } from "../../domain/ports/repositories/user.reposi
 import type { WhatsAppChannel } from "../../domain/ports/whatsapp-channel.js";
 import type { AttachmentStore } from "../../domain/ports/attachment-store.js";
 import type { MediaAttachment } from "../../agent/types.js";
-import { storePendingMedia } from "../../agent/pending-media.js";
 import { extractReceiptData, validateExtraction, formatExtractionForAgent } from "../../plugins/expenses/services/receipt-extractor.js";
 import { createAgentContext } from "../../application/agent-context.js";
 import { loadConversationHistory } from "../../agent/load-history.js";
@@ -334,8 +333,30 @@ export function createWebhookController(
       const extracted = await extractReceiptData(attachments[0]!);
       if (extracted) {
         const issues = validateExtraction(extracted);
-        messageText = formatExtractionForAgent(extracted, issues);
-        logger.info({ vendor: extracted.vendor, amount: extracted.amount }, "Receipt extracted at webhook — enriching query");
+
+        // Persist receipt image in attachments table for later Drive upload
+        const ext = (attachments[0]!.mimeType.split("/")[1] ?? "jpg").replace("jpeg", "jpg");
+        const safeVendor = (extracted.vendor || "unknown").replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ-]/g, "_").slice(0, 30).toLowerCase();
+        const receiptFilename = `receipt_${safeVendor}_${extracted.date || "nodate"}.${ext}`;
+        try {
+          await attachmentStore.store({
+            orgId,
+            userId,
+            filename: receiptFilename,
+            attachment: {
+              base64: Buffer.from(attachments[0]!.data).toString("base64"),
+              mimetype: attachments[0]!.mimeType,
+              filename: receiptFilename,
+            },
+            docType: "receipt",
+          });
+          logger.info({ receiptFilename, userId }, "Receipt image saved to attachments table");
+        } catch (err) {
+          logger.error({ err, receiptFilename }, "Failed to save receipt image to attachments");
+        }
+
+        messageText = formatExtractionForAgent(extracted, issues, receiptFilename);
+        logger.info({ vendor: extracted.vendor, amount: extracted.amount, receiptFilename }, "Receipt extracted at webhook — enriching query");
         attachments = undefined; // extraction succeeded — image data no longer needed
       } else {
         logger.warn("Receipt extraction returned null — forwarding image to agent as-is");

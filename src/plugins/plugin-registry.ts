@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import type { AgentTools } from "../agent/types.js";
 import type { Plugin } from "./plugin.interface.js";
 import type { ConversationManager } from "../application/managers/conversation.manager.js";
+import type { AttachmentStore } from "../domain/ports/attachment-store.js";
 import { createDelegationTools } from "../agent/delegation.js";
 import { logger } from "../shared/logger.js";
 
@@ -36,8 +37,8 @@ export class PluginRegistry {
     return tools;
   }
 
-  getDelegationTools(convManager: ConversationManager): AgentTools {
-    return createDelegationTools(this.getAll(), convManager);
+  getDelegationTools(convManager: ConversationManager, attachmentStore?: AttachmentStore): AgentTools {
+    return createDelegationTools(this.getAll(), convManager, attachmentStore);
   }
 
   mountRoutes(app: Hono): void {

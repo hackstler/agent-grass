@@ -4,9 +4,10 @@ import type { AgentTools, DelegationResult, MediaAttachment } from "./types.js";
 import type { Plugin } from "../plugins/plugin.interface.js";
 import { getAgentContextValue } from "../application/agent-context.js";
 import { loadConversationHistory } from "./load-history.js";
-import { takePendingMedia, storePendingMedia } from "./pending-media.js";
+import { takePendingMedia } from "./pending-media.js";
 import { extractReceiptData, validateExtraction, formatExtractionForAgent } from "../plugins/expenses/services/receipt-extractor.js";
 import type { ConversationManager } from "../application/managers/conversation.manager.js";
+import type { AttachmentStore } from "../domain/ports/attachment-store.js";
 import { ragConfig } from "../plugins/rag/config/rag.config.js";
 import { logger } from "../shared/logger.js";
 import { getToolPermission } from "./permissions.js";
@@ -71,7 +72,7 @@ function wrapToolsWithPermissions(tools: AgentTools, query: string): AgentTools 
  * Returns a DelegationResult — the shared contract consumed by
  * chat.routes.ts (streaming SSE) and internal.controller.ts (WhatsApp).
  */
-function createDelegationTool(plugin: Plugin, convManager: ConversationManager) {
+function createDelegationTool(plugin: Plugin, convManager: ConversationManager, attachmentStore?: AttachmentStore) {
   return tool({
     description: `Delegate to ${plugin.name}: ${plugin.description}`,
     inputSchema: z.object({
@@ -112,8 +113,33 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager) 
           const extracted = await extractReceiptData(attachments[0]!);
           if (extracted) {
             const issues = validateExtraction(extracted);
-            const enrichedQuery = formatExtractionForAgent(extracted, issues);
-            query = enrichedQuery;
+
+            // Persist receipt image for later Drive upload (same pattern as webhook)
+            let receiptFilename: string | undefined;
+            if (attachmentStore && userId && orgId) {
+              const ext = (attachments[0]!.mimeType.split("/")[1] ?? "jpg").replace("jpeg", "jpg");
+              const safeVendor = (extracted.vendor || "unknown").replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ-]/g, "_").slice(0, 30).toLowerCase();
+              receiptFilename = `receipt_${safeVendor}_${extracted.date || "nodate"}.${ext}`;
+              try {
+                await attachmentStore.store({
+                  orgId,
+                  userId,
+                  filename: receiptFilename,
+                  attachment: {
+                    base64: Buffer.from(attachments[0]!.data).toString("base64"),
+                    mimetype: attachments[0]!.mimeType,
+                    filename: receiptFilename,
+                  },
+                  docType: "receipt",
+                });
+                logger.info({ receiptFilename, userId }, "Receipt image saved in delegation fallback");
+              } catch (err) {
+                logger.error({ err, receiptFilename }, "Failed to save receipt image in delegation");
+                receiptFilename = undefined;
+              }
+            }
+
+            query = formatExtractionForAgent(extracted, issues, receiptFilename);
             attachments = undefined; // don't pass raw image to the conversational agent
             logger.info({ vendor: extracted.vendor, amount: extracted.amount, confidence: extracted.confidence, issues }, "Receipt extraction complete");
           } else {
@@ -166,10 +192,10 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager) 
  * Creates delegation tools for all registered plugins.
  * Each plugin becomes a single tool the coordinator can invoke.
  */
-export function createDelegationTools(plugins: Plugin[], convManager: ConversationManager): AgentTools {
+export function createDelegationTools(plugins: Plugin[], convManager: ConversationManager, attachmentStore?: AttachmentStore): AgentTools {
   const tools: AgentTools = {};
   for (const plugin of plugins) {
-    const t = createDelegationTool(plugin, convManager);
+    const t = createDelegationTool(plugin, convManager, attachmentStore);
     tools[`delegateTo_${plugin.id}`] = t;
   }
   return tools;
