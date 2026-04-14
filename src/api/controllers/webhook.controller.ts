@@ -327,6 +327,8 @@ export function createWebhookController(
     const history = await loadConversationHistory(convManager, conversationId);
 
     // ── Receipt extraction at the entry point (before agents) ──────────────
+    // If extraction succeeds, the enriched text replaces the raw image — no need to
+    // store pending media (which would cause the delegation fallback to re-extract).
     if (attachments?.length && attachments[0]!.mimeType.startsWith("image/")) {
       logger.info({ bytes: attachments[0]!.data.length, mimeType: attachments[0]!.mimeType }, "Attempting receipt extraction at webhook level");
       const extracted = await extractReceiptData(attachments[0]!);
@@ -334,14 +336,11 @@ export function createWebhookController(
         const issues = validateExtraction(extracted);
         messageText = formatExtractionForAgent(extracted, issues);
         logger.info({ vendor: extracted.vendor, amount: extracted.amount }, "Receipt extracted at webhook — enriching query");
-        storePendingMedia(conversationId, attachments);
-        attachments = undefined;
+        attachments = undefined; // extraction succeeded — image data no longer needed
       } else {
         logger.warn("Receipt extraction returned null — forwarding image to agent as-is");
-        storePendingMedia(conversationId, attachments);
+        // Keep attachments so the agent can try to process the image directly
       }
-    } else if (attachments) {
-      storePendingMedia(conversationId, attachments);
     }
 
     // Run agent (multimodal if attachments still present, text-only if extraction succeeded)

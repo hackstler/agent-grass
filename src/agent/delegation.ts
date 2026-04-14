@@ -102,8 +102,11 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager) 
         );
 
         // ── Gather phase: structured extraction for expenses with images ────
-        // Note: For WhatsApp, extraction now happens at the webhook level (before agents).
-        // This path is a fallback for other channels or if webhook extraction was skipped.
+        // Only run extraction if this delegation carries a NEW image (not re-stored media
+        // from a previous turn). The webhook already extracts for WhatsApp; this is a
+        // fallback for dashboard or if webhook extraction was skipped.
+        // IMPORTANT: Do NOT re-store media after extraction — that causes an infinite loop
+        // where every subsequent delegation re-extracts and overwrites the user's message.
         if (plugin.id === "expenses" && attachments?.length) {
           logger.info({ mediaCount: attachments.length, bytes: attachments[0]!.data.length }, "Running receipt extraction in delegation (fallback)");
           const extracted = await extractReceiptData(attachments[0]!);
@@ -111,8 +114,6 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager) 
             const issues = validateExtraction(extracted);
             const enrichedQuery = formatExtractionForAgent(extracted, issues);
             query = enrichedQuery;
-            // Re-store media so tools (e.g. uploadReceiptToDrive) can still access it
-            if (conversationId) storePendingMedia(conversationId, attachments);
             attachments = undefined; // don't pass raw image to the conversational agent
             logger.info({ vendor: extracted.vendor, amount: extracted.amount, confidence: extracted.confidence, issues }, "Receipt extraction complete");
           } else {
