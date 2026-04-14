@@ -205,7 +205,7 @@ export function validateExtraction(data: ExtractedReceipt): string[] {
  * Format extracted data into a structured text block for the conversational agent.
  * Includes validation warnings if any.
  */
-export function formatExtractionForAgent(data: ExtractedReceipt, issues: string[]): string {
+export function formatExtractionForAgent(data: ExtractedReceipt, issues: string[], receiptFilename?: string): string {
   const lines = [
     "== DATOS EXTRAÍDOS DEL TICKET (extracción automática) ==",
     `Proveedor: ${data.vendor || "[NO LEGIBLE]"}`,
@@ -223,9 +223,13 @@ export function formatExtractionForAgent(data: ExtractedReceipt, issues: string[
     ? `\nCampos no legibles: ${data.unreadableFields.join(", ")}`
     : "";
 
+  const receiptRef = receiptFilename
+    ? `\nComprobante guardado: ${receiptFilename}`
+    : "";
+
   const warnings = issues.length > 0
     ? `\n⚠️ PROBLEMAS DETECTADOS: ${issues.join("; ")}\nPide al usuario que confirme o corrija estos datos.`
     : "";
 
-  return `${lines}${unreadable}${warnings}\n\nPresenta estos datos al usuario y pide confirmación ANTES de guardar.`;
+  return `${lines}${unreadable}${receiptRef}${warnings}`;
 }
