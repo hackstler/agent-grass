@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { quoteConfig } from "../config/quote.config.js";
+import { logger } from "../../../shared/logger.js";
 
 export interface QuoteLineItem {
   description: string;
@@ -88,6 +89,14 @@ function fmt(n: number, currency: string): string {
 
 export class PdfService {
   async generateQuotePdf(data: QuoteData): Promise<string> {
+    logger.info(
+      {
+        quoteNumber: data.quoteNumber,
+        clientName: data.clientName,
+        lineItemsCount: data.lineItems?.length ?? 0,
+      },
+      "[PdfService] generateQuotePdf() ENTRY",
+    );
     const doc = await PDFDocument.create();
     const page = doc.addPage([PAGE_W, PAGE_H]);
     const regular = await doc.embedFont(StandardFonts.Helvetica);
@@ -258,7 +267,12 @@ export class PdfService {
     });
 
     const bytes = await doc.save();
-    return Buffer.from(bytes).toString("base64");
+    const base64 = Buffer.from(bytes).toString("base64");
+    logger.info(
+      { quoteNumber: data.quoteNumber, pdfKB: Math.round(base64.length / 1024) },
+      "[PdfService] generateQuotePdf() RETURNED",
+    );
+    return base64;
   }
 
   /**
@@ -267,6 +281,14 @@ export class PdfService {
    * 7-column comparison table, legal texts at bottom.
    */
   async generateComparisonPdf(data: ComparisonPdfData): Promise<string> {
+    logger.info(
+      {
+        quoteNumber: data.quoteNumber,
+        clientName: data.clientName,
+        rowsCount: data.rows?.length ?? 0,
+      },
+      "[PdfService] generateComparisonPdf() ENTRY",
+    );
     const doc = await PDFDocument.create();
     const LW = 842;
     const LH = 595;
@@ -513,6 +535,11 @@ export class PdfService {
     });
 
     const bytes = await doc.save();
-    return Buffer.from(bytes).toString("base64");
+    const base64 = Buffer.from(bytes).toString("base64");
+    logger.info(
+      { quoteNumber: data.quoteNumber, pdfKB: Math.round(base64.length / 1024) },
+      "[PdfService] generateComparisonPdf() RETURNED",
+    );
+    return base64;
   }
 }

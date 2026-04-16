@@ -87,6 +87,19 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager, 
           ? { userId: userId ?? "anonymous", orgId, conversationId }
           : undefined;
 
+        logger.info(
+          {
+            pluginId: plugin.id,
+            queryPreview: query.slice(0, 200),
+            queryLength: query.length,
+            orgId,
+            userId,
+            conversationId,
+            availableTools: Object.keys(plugin.tools),
+          },
+          "[Delegation] ENTRY — sub-agent invocation",
+        );
+
         // Load conversation history so the sub-agent has cross-turn context
         const history = conversationId
           ? await loadConversationHistory(convManager, conversationId, ragConfig.windowSize)
@@ -153,6 +166,16 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager, 
         // Wrap plugin tools with permission checks
         const wrappedTools = wrapToolsWithPermissions(plugin.tools, query);
 
+        logger.info(
+          {
+            pluginId: plugin.id,
+            historyMsgs: history.length,
+            wrappedToolNames: Object.keys(wrappedTools),
+            isConfirmedQuery: query.startsWith("CONFIRMED:"),
+          },
+          "[Delegation] About to call plugin.agent.generate()",
+        );
+
         const result = await plugin.agent.generate({
           prompt: query,
           messages: history,
@@ -168,6 +191,18 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager, 
 
         // Flatten toolResults from all steps — preserves the DelegationResult contract
         const toolResults = result.steps.flatMap((s) => s.toolResults);
+
+        logger.info(
+          {
+            pluginId: plugin.id,
+            stepsCount: result.steps.length,
+            toolResultsCount: toolResults.length,
+            toolNames: toolResults.map((tr) => tr.toolName),
+            textPreview: result.text.slice(0, 200),
+            textLength: result.text.length,
+          },
+          "[Delegation] sub-agent generate() RETURNED",
+        );
 
         // Post-delegation verification
         const verification = verifyDelegationResult(plugin.id, { text: result.text, toolResults });

@@ -364,6 +364,19 @@ export function createWebhookController(
       }
     }
 
+    logger.info(
+      {
+        userId,
+        orgId,
+        conversationId,
+        promptPreview: messageText.slice(0, 200),
+        memoryMsgs: memoryMessages.length,
+        historyMsgs: history.length,
+        hasAttachments: !!attachments?.length,
+      },
+      "[webhook] About to call coordinator agent.generate()",
+    );
+
     // Run agent (multimodal if attachments still present, text-only if extraction succeeded)
     const result = await agent.generate({
       prompt: messageText,
@@ -373,6 +386,21 @@ export function createWebhookController(
     });
 
     const replyText = result.text?.trim();
+    logger.info(
+      {
+        userId,
+        replyLength: replyText?.length ?? 0,
+        replyPreview: replyText?.slice(0, 200),
+        stepCount: result.steps.length,
+        toolsByStep: result.steps.map((s, i) => ({
+          step: i,
+          tools: s.toolResults.map((tr) => tr.toolName),
+        })),
+        pdfFilenameInResult: findPdfFilename(result),
+      },
+      "[webhook] coordinator agent.generate() RETURNED",
+    );
+
     if (!replyText) {
       logger.warn({ messageId }, "Empty agent response");
       return;

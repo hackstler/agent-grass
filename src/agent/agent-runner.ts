@@ -1,6 +1,7 @@
 import { generateText, streamText, stepCountIs } from "ai";
 import type { LanguageModel, ModelMessage, ToolSet } from "ai";
 import type { AgentContext, AgentGenerateResult, AgentStreamResult, MediaAttachment } from "./types.js";
+import { logger } from "../shared/logger.js";
 
 export interface AgentRunnerConfig {
   model: LanguageModel;
@@ -67,14 +68,42 @@ export class AgentRunner {
 
     const system = typeof this.config.system === "function" ? this.config.system() : this.config.system;
 
+    const toolsInUse = toolOverrides ?? this.config.tools;
+    const toolNames = Object.keys(toolsInUse ?? {});
+    logger.info(
+      {
+        promptPreview: prompt.slice(0, 200),
+        historyMsgs: messages?.length ?? 0,
+        toolCount: toolNames.length,
+        toolNames,
+        hasAttachments: !!attachments?.length,
+      },
+      "[AgentRunner] generate() ENTRY",
+    );
+
     const result = await generateText({
       model: this.config.model,
       system,
       messages: allMessages,
-      tools: toolOverrides ?? this.config.tools,
+      tools: toolsInUse,
       stopWhen: stepCountIs(maxSteps ?? this.config.maxSteps),
       ...(experimental_context ? { experimental_context } : {}),
     });
+
+    const stepsSummary = result.steps.map((step, i) => ({
+      step: i,
+      toolCalls: (step.toolResults ?? []).map((tr) => tr.toolName),
+    }));
+    logger.info(
+      {
+        textPreview: (result.text ?? "").slice(0, 200),
+        textLength: (result.text ?? "").length,
+        stepCount: result.steps.length,
+        steps: stepsSummary,
+        finishReason: (result as unknown as { finishReason?: string }).finishReason,
+      },
+      "[AgentRunner] generate() RESULT",
+    );
 
     // Map AI SDK result to our domain type — single point of adaptation
     return {
