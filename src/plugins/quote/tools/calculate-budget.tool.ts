@@ -59,8 +59,14 @@ export function createCalculateBudgetTool({ catalogService, pdfService, attachme
     inputSchema: defaultStrategy.getInputSchema(),
 
     execute: async (input, { experimental_context }) => {
+      logger.info(
+        { inputKeys: Object.keys((input as Record<string, unknown>) ?? {}), inputPreview: JSON.stringify(input).slice(0, 400) },
+        "[calculateBudget] execute() ENTRY",
+      );
+
       const orgId = getAgentContextValue({ experimental_context }, "orgId");
       if (!orgId) {
+        logger.error("[calculateBudget] EARLY EXIT — missing orgId in context");
         return {
           success: false, clientName: "", rows: [], pdfGenerated: false, filename: "",
           error: "Missing orgId in request context",
@@ -73,13 +79,28 @@ export function createCalculateBudgetTool({ catalogService, pdfService, attachme
       const clientAddress = (strategyInput["clientAddress"] as string) ?? "";
       const province = (strategyInput["province"] as string) ?? "";
 
+      logger.info({ orgId, userId, clientName, clientAddress, hasProvince: !!province }, "[calculateBudget] context resolved");
+
       // Fetch org data and catalog in parallel
       const [org, activeCatalog] = await Promise.all([
         organizationRepo.findByOrgId(orgId),
         catalogService.getActiveCatalog(orgId),
       ]);
 
+      logger.info(
+        {
+          orgId,
+          hasOrg: !!org,
+          hasBusinessLogicUrl: !!org?.businessLogicUrl,
+          hasActiveCatalog: !!activeCatalog,
+          catalogId: activeCatalog?.id,
+          catalogBusinessType: activeCatalog?.businessType,
+        },
+        "[calculateBudget] org+catalog loaded",
+      );
+
       if (!activeCatalog) {
+        logger.error({ orgId, hasBusinessLogicUrl: !!org?.businessLogicUrl }, "[calculateBudget] EARLY EXIT — no active catalog");
         return {
           success: false, clientName, rows: [], pdfGenerated: false, filename: "",
           error: "No active catalog found for this organization",
