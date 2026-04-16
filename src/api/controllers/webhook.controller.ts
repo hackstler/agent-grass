@@ -385,7 +385,8 @@ export function createWebhookController(
       ...(attachments ? { attachments } : {}),
     });
 
-    const replyText = result.text?.trim();
+    let replyText = result.text?.trim();
+    const pdfFilename = findPdfFilename(result);
     logger.info(
       {
         userId,
@@ -396,7 +397,7 @@ export function createWebhookController(
           step: i,
           tools: s.toolResults.map((tr) => tr.toolName),
         })),
-        pdfFilenameInResult: findPdfFilename(result),
+        pdfFilenameInResult: pdfFilename,
       },
       "[webhook] coordinator agent.generate() RETURNED",
     );
@@ -406,7 +407,30 @@ export function createWebhookController(
       return;
     }
 
-    // Persist
+    // ── Anti-hallucination guard ──────────────────────────────────────────────
+    // Deterministic check: if the reply CLAIMS a quote/PDF was just generated,
+    // a real tool result MUST exist (calculateBudget produces { pdfGenerated:true,
+    // filename:"..." }). When the LLM affirms generation without a tool result,
+    // it is hallucinating — replace the reply with a honest retry message
+    // instead of lying to the user.
+    //
+    // Patterns matched are present-tense affirmations of NEW generation only.
+    // Past references like "ya generamos uno antes" are intentionally NOT matched.
+    const HALLUCINATED_GENERATION = /(?:^|[\s,.])(?:he|hemos|se ha|se han|ya he|de acuerdo[, ]+he)\s+generad[oa]\b|nuevo\s+presupuesto\s+(?:para|de|generado)|presupuesto\s+(?:listo|completo|generado correctamente)|aqu[ií]\s+tienes\s+(?:el|tu)\s+presupuesto|PRES-\d{8}-\d{4}\.pdf/i;
+    if (!pdfFilename && HALLUCINATED_GENERATION.test(replyText)) {
+      logger.warn(
+        {
+          userId,
+          replyPreview: replyText.slice(0, 200),
+          stepCount: result.steps.length,
+          toolNamesByStep: result.steps.map((s) => s.toolResults.map((tr) => tr.toolName)),
+        },
+        "[webhook] HALLUCINATION DETECTED — reply claims PDF generation but no tool result exists",
+      );
+      replyText = "Lo siento, no he podido generar el presupuesto en este intento. Por favor, repíteme los datos del cliente y los detalles para volver a intentarlo.";
+    }
+
+    // Persist (the cleaned replyText, not the hallucination)
     const sources = extractSources(result.steps);
     const toolSummaries = extractToolSummaries(result.steps);
     try {

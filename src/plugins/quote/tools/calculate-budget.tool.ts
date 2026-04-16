@@ -1,4 +1,5 @@
 import { tool } from "ai";
+import crypto from "crypto";
 import type { CatalogService } from "../services/catalog.service.js";
 import type { PdfService, CompanyDetails } from "../services/pdf.service.js";
 import type { AttachmentStore } from "../../../domain/ports/attachment-store.js";
@@ -9,6 +10,41 @@ import type { QuoteFooterSettings } from "../services/pdf.service.js";
 import { quoteConfig } from "../config/quote.config.js";
 import { getAgentContextValue } from "../../../application/agent-context.js";
 import { logger } from "../../../shared/logger.js";
+
+/**
+ * Idempotency window: if the same user re-invokes calculateBudget with
+ * IDENTICAL inputs within this window, return the cached quote instead of
+ * regenerating. This protects against:
+ *   - LLM re-invoking the tool for the same request across turns
+ *   - User resending the same WhatsApp message
+ *   - Webhook deduplication races
+ *
+ * Different inputs (any field changed) produce a different hash → fresh quote.
+ */
+const IDEMPOTENCY_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Build a deterministic hash of the calculateBudget input. Keys are sorted
+ * alphabetically and string values are normalized (trim + lowercase) so that
+ * "Carlos Ruiz" and "carlos ruiz " produce the same hash. Numbers and booleans
+ * are stringified directly.
+ */
+function buildInputHash(input: Record<string, unknown>): string {
+  const sortedKeys = Object.keys(input).sort();
+  const normalized: Record<string, unknown> = {};
+  for (const key of sortedKeys) {
+    const value = input[key];
+    if (typeof value === "string") {
+      normalized[key] = value.trim().toLowerCase();
+    } else if (value === null || value === undefined) {
+      // skip — undefined fields shouldn't affect the hash
+    } else {
+      normalized[key] = value;
+    }
+  }
+  const serialized = JSON.stringify(normalized);
+  return crypto.createHash("sha256").update(serialized).digest("hex");
+}
 
 export interface CalculateBudgetDeps {
   catalogService: CatalogService;
@@ -80,6 +116,73 @@ export function createCalculateBudgetTool({ catalogService, pdfService, attachme
       const province = (strategyInput["province"] as string) ?? "";
 
       logger.info({ orgId, userId, clientName, clientAddress, hasProvince: !!province }, "[calculateBudget] context resolved");
+
+      // ── Idempotency check: short-circuit if an identical quote was just made.
+      // Deterministic short-circuit BEFORE invoking the business function — this
+      // is the safety net against the LLM (any sub-agent) re-invoking the tool
+      // for the same logical request across turns.
+      const inputHash = buildInputHash(strategyInput);
+      if (userId) {
+        const recent = await quoteRepo.findRecentByUserAndHash(
+          userId,
+          inputHash,
+          IDEMPOTENCY_WINDOW_MS,
+        );
+        if (recent) {
+          logger.info(
+            {
+              orgId,
+              userId,
+              inputHash,
+              quoteId: recent.id,
+              filename: recent.filename,
+              ageMs: Date.now() - recent.createdAt.getTime(),
+            },
+            "[calculateBudget] IDEMPOTENT HIT — returning cached quote, skipping business function",
+          );
+          // Re-publish the cached PDF to the AttachmentStore in case the cache
+          // entry expired. The DB row holds the canonical pdfBase64.
+          if (recent.pdfBase64) {
+            try {
+              await attachmentStore.store({
+                orgId,
+                userId,
+                filename: recent.filename,
+                attachment: {
+                  base64: recent.pdfBase64,
+                  mimetype: "application/pdf",
+                  filename: recent.filename,
+                },
+                docType: "quote",
+                sourceId: recent.id,
+              });
+            } catch (err) {
+              logger.warn({ err, filename: recent.filename }, "[calculateBudget] re-store of cached PDF failed");
+            }
+          }
+          // Return the same shape as a fresh result. The LLM cannot tell the
+          // difference; the webhook will deliver the cached PDF as usual.
+          const cachedRows = Array.isArray((recent.quoteData as { rows?: unknown[] } | null)?.rows)
+            ? ((recent.quoteData as { rows: unknown[] }).rows)
+            : [];
+          return {
+            success: true,
+            clientName: recent.clientName,
+            sectionTitle: undefined,
+            notes: undefined,
+            rows: cachedRows,
+            representativeTotals: {
+              subtotal: Number(recent.subtotal),
+              vat: Number(recent.vatAmount),
+              total: Number(recent.total),
+            },
+            extraColumns: undefined,
+            pdfGenerated: true,
+            filename: recent.filename,
+            idempotent: true,
+          };
+        }
+      }
 
       // Fetch org data and catalog in parallel
       const [org, activeCatalog] = await Promise.all([
@@ -205,6 +308,7 @@ export function createCalculateBudgetTool({ catalogService, pdfService, attachme
             pdfBase64: pdfBase64 ?? null,
             filename,
             quoteData: result.quoteData as Record<string, unknown>,
+            inputHash,
             ...result.extraColumns,
           });
           quoteId = quote.id;

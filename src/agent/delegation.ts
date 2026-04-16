@@ -100,9 +100,16 @@ function createDelegationTool(plugin: Plugin, convManager: ConversationManager, 
           "[Delegation] ENTRY — sub-agent invocation",
         );
 
-        // Load conversation history so the sub-agent has cross-turn context
+        // Load conversation history so the sub-agent has cross-turn context.
+        // CRITICAL: enrichWithTools=false. If the sub-agent sees `[Herramientas:
+        // calculateBudget]` from past turns, Gemini deduces "ya lo hice" and
+        // refuses to invoke the tool again, hallucinating a text-only response.
+        // Sub-agents must always re-evaluate tool invocation from scratch.
         const history = conversationId
-          ? await loadConversationHistory(convManager, conversationId, ragConfig.windowSize)
+          ? await loadConversationHistory(convManager, conversationId, {
+              windowSize: ragConfig.windowSize,
+              enrichWithTools: false,
+            })
           : [];
 
         // Forward any pending media attachments (images/docs from this request)

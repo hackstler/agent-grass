@@ -370,6 +370,7 @@ export interface Quote {
   areaM2: string | null;
   perimeterLm: string | null;
   province: string | null;
+  inputHash: string | null;
   createdAt: Date;
 }
 
@@ -391,6 +392,7 @@ export interface NewQuote {
   areaM2?: string | null | undefined;
   perimeterLm?: string | null | undefined;
   province?: string | null | undefined;
+  inputHash?: string | null | undefined;
   createdAt?: Date | undefined;
 }
 

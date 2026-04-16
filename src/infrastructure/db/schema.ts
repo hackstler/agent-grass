@@ -301,26 +301,38 @@ export interface GrassQuoteDataJson {
   aridosNote?: string;
 }
 
-export const quotes = pgTable("quotes", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  orgId: text("org_id").notNull(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  quoteNumber: text("quote_number").notNull(),
-  clientName: text("client_name").notNull(),
-  clientAddress: text("client_address"),
-  lineItems: jsonb("line_items").notNull().$type<QuoteLineItemJson[]>(),
-  subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull(),
-  vatAmount: numeric("vat_amount", { precision: 10, scale: 2 }).notNull(),
-  total: numeric("total", { precision: 10, scale: 2 }).notNull(),
-  pdfBase64: text("pdf_base64"),
-  filename: text("filename").notNull(),
-  quoteData: jsonb("quote_data").$type<Record<string, unknown> | null>(),
-  surfaceType: text("surface_type"),
-  areaM2: numeric("area_m2", { precision: 10, scale: 2 }),
-  perimeterLm: numeric("perimeter_lm", { precision: 10, scale: 2 }),
-  province: text("province"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const quotes = pgTable(
+  "quotes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: text("org_id").notNull(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    quoteNumber: text("quote_number").notNull(),
+    clientName: text("client_name").notNull(),
+    clientAddress: text("client_address"),
+    lineItems: jsonb("line_items").notNull().$type<QuoteLineItemJson[]>(),
+    subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull(),
+    vatAmount: numeric("vat_amount", { precision: 10, scale: 2 }).notNull(),
+    total: numeric("total", { precision: 10, scale: 2 }).notNull(),
+    pdfBase64: text("pdf_base64"),
+    filename: text("filename").notNull(),
+    quoteData: jsonb("quote_data").$type<Record<string, unknown> | null>(),
+    surfaceType: text("surface_type"),
+    areaM2: numeric("area_m2", { precision: 10, scale: 2 }),
+    perimeterLm: numeric("perimeter_lm", { precision: 10, scale: 2 }),
+    province: text("province"),
+    // Deterministic hash of the calculateBudget input — used for idempotency.
+    // Two quotes with identical inputs (same client + same params) produce the
+    // same hash, allowing the tool to short-circuit the LLM-driven flow and
+    // return a previously generated quote instead of re-calling the business
+    // function. Nullable to remain backward-compatible with pre-existing rows.
+    inputHash: text("input_hash"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    userInputHashIdx: index("quotes_user_input_hash_idx").on(table.userId, table.inputHash),
+  })
+);
 
 // ── Attachments (persistent, cross-plugin file storage) ──────────────────────
 export const attachments = pgTable(

@@ -33,6 +33,23 @@ interface Session {
 }
 
 /**
+ * Options for history loading. The `enrichWithTools` flag controls whether
+ * `[Herramientas: ...]` prefixes are added to assistant messages.
+ *
+ * - **Coordinator** (default `true`): needs to know which agents already
+ *   handled what across turns to avoid duplicate routing.
+ * - **Sub-agents** (must pass `false`): the prefix causes deterministic
+ *   re-invocation skipping. When the sub-agent sees `[Herramientas:
+ *   calculateBudget]` in past assistant messages, the LLM concludes
+ *   "ya lo hice" and refuses to invoke the tool again, hallucinating a
+ *   text response instead. Sub-agents must always re-evaluate fresh.
+ */
+export interface LoadHistoryOptions {
+  windowSize?: number;
+  enrichWithTools?: boolean;
+}
+
+/**
  * Load conversation history with session-aware compaction.
  *
  * Strategy (inspired by Claude Code's context management):
@@ -50,8 +67,16 @@ interface Session {
 export async function loadConversationHistory(
   convManager: ConversationManager,
   conversationId: string,
-  windowSize = ragConfig.windowSize,
+  windowSizeOrOptions: number | LoadHistoryOptions = ragConfig.windowSize,
 ): Promise<ModelMessage[]> {
+  // Backward-compatible: accept either a number (windowSize) or an options object
+  const opts: LoadHistoryOptions =
+    typeof windowSizeOrOptions === "number"
+      ? { windowSize: windowSizeOrOptions, enrichWithTools: true }
+      : { enrichWithTools: true, ...windowSizeOrOptions };
+  const windowSize = opts.windowSize ?? ragConfig.windowSize;
+  const enrichTools = opts.enrichWithTools ?? true;
+
   try {
     const conv = await convManager.getById(conversationId);
     const allMessages = conv.messages ?? [];
@@ -66,7 +91,9 @@ export async function loadConversationHistory(
       const recent = allMessages.slice(-windowSize);
       return recent.map((m) => ({
         role: m.role as "user" | "assistant" | "system",
-        content: enrichWithToolContext(m.role, m.content, m.metadata?.toolCalls),
+        content: enrichTools
+          ? enrichWithToolContext(m.role, m.content, m.metadata?.toolCalls)
+          : m.content,
       }));
     }
 
@@ -105,7 +132,9 @@ export async function loadConversationHistory(
     for (const m of currentMessages) {
       result.push({
         role: m.role as "user" | "assistant" | "system",
-        content: enrichWithToolContext(m.role, m.content, m.metadata?.toolCalls),
+        content: enrichTools
+          ? enrichWithToolContext(m.role, m.content, m.metadata?.toolCalls)
+          : m.content,
       });
     }
 
