@@ -20,51 +20,70 @@ function hasOverlap(startA: Date, endA: Date, startB: Date, endB: Date): boolean
   return startA < endB && startB < endA;
 }
 
-/** Find free slots around the requested time on the same day. */
+/** Get minute-of-day (0–1439) for a Date in a given IANA timezone. */
+function getMinuteOfDay(date: Date, tz: string): number {
+  const parts = date.toLocaleTimeString("en-GB", {
+    timeZone: tz, hour12: false, hour: "2-digit", minute: "2-digit",
+  }).split(":");
+  return parseInt(parts[0]!) * 60 + parseInt(parts[1]!);
+}
+
+/** Format minutes-since-midnight as HH:MM. */
+function fmtMin(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Format an ISO datetime as HH:MM in the user's timezone. */
+function formatTime(iso: string, tz: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString("es-ES", {
+      timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
+    });
+  } catch {
+    return iso;
+  }
+}
+
+/**
+ * Find free slots on the same day as requestedStart.
+ * All hour calculations use the user's timezone so displayed
+ * times match what they see in Google Calendar.
+ */
 function findSuggestedSlots(
   requestedStart: Date,
   durationMs: number,
   events: CalendarEvent[],
+  tz: string,
   maxSlots = 3,
 ): string[] {
-  // Build a list of busy ranges for the day (sorted)
-  const dayStart = new Date(requestedStart);
-  dayStart.setHours(8, 0, 0, 0);
-  const dayEnd = new Date(requestedStart);
-  dayEnd.setHours(21, 0, 0, 0);
+  const WORK_START = 8 * 60;   // 08:00
+  const WORK_END = 21 * 60;    // 21:00
+  const durationMin = Math.ceil(durationMs / 60_000);
 
+  // Convert events to minute-of-day ranges in the user's timezone
   const busy = events
-    .map((e) => ({ start: new Date(e.start), end: new Date(e.end) }))
-    .filter((b) => b.start < dayEnd && b.end > dayStart)
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
+    .map((e) => ({
+      startMin: getMinuteOfDay(new Date(e.start), tz),
+      endMin: getMinuteOfDay(new Date(e.end), tz),
+    }))
+    .filter((b) => b.startMin < WORK_END && b.endMin > WORK_START)
+    .sort((a, b) => a.startMin - b.startMin);
 
   const slots: string[] = [];
-  let cursor = dayStart;
+  let cursor = WORK_START;
 
   for (const block of busy) {
-    const gapEnd = block.start;
-    if (gapEnd.getTime() - cursor.getTime() >= durationMs && cursor >= dayStart) {
-      // There's a free slot before this busy block
-      const slotStart = new Date(Math.max(cursor.getTime(), dayStart.getTime()));
-      const slotEnd = new Date(slotStart.getTime() + durationMs);
-      if (slotEnd <= dayEnd) {
-        const hStart = slotStart.toTimeString().slice(0, 5);
-        const hEnd = slotEnd.toTimeString().slice(0, 5);
-        slots.push(`${hStart}-${hEnd}`);
-      }
+    if (block.startMin - cursor >= durationMin) {
+      slots.push(`${fmtMin(cursor)}-${fmtMin(cursor + durationMin)}`);
     }
-    cursor = new Date(Math.max(cursor.getTime(), block.end.getTime()));
+    cursor = Math.max(cursor, block.endMin);
     if (slots.length >= maxSlots) break;
   }
 
-  // Check gap after last busy block
-  if (slots.length < maxSlots && dayEnd.getTime() - cursor.getTime() >= durationMs) {
-    const slotEnd = new Date(cursor.getTime() + durationMs);
-    if (slotEnd <= dayEnd) {
-      const hStart = cursor.toTimeString().slice(0, 5);
-      const hEnd = slotEnd.toTimeString().slice(0, 5);
-      slots.push(`${hStart}-${hEnd}`);
-    }
+  if (slots.length < maxSlots && WORK_END - cursor >= durationMin) {
+    slots.push(`${fmtMin(cursor)}-${fmtMin(cursor + durationMin)}`);
   }
 
   return slots;
@@ -147,7 +166,7 @@ export function createCreateEventTool({ calendarService }: CreateEventDeps) {
 
         if (conflicts.length > 0) {
           const durationMs = endDate.getTime() - startDate.getTime();
-          const suggestedSlots = findSuggestedSlots(startDate, durationMs, existingEvents);
+          const suggestedSlots = findSuggestedSlots(startDate, durationMs, existingEvents, timeZone);
 
           const conflictDetails = conflicts.map((c) => ({
             summary: c.summary,
@@ -165,7 +184,7 @@ export function createCreateEventTool({ calendarService }: CreateEventDeps) {
             conflict: true,
             message:
               `No se ha creado el evento porque hay un conflicto de horario. ` +
-              `Ya tienes "${conflicts[0]!.summary}" de ${formatTime(conflicts[0]!.start)} a ${formatTime(conflicts[0]!.end)}.`,
+              `Ya tienes "${conflicts[0]!.summary}" de ${formatTime(conflicts[0]!.start, timeZone)} a ${formatTime(conflicts[0]!.end, timeZone)}.`,
             conflictingEvents: conflictDetails,
             suggestedSlots,
             suggestion:
@@ -194,12 +213,3 @@ export function createCreateEventTool({ calendarService }: CreateEventDeps) {
   });
 }
 
-/** Extract HH:MM from an ISO datetime string. */
-function formatTime(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toTimeString().slice(0, 5);
-  } catch {
-    return iso;
-  }
-}
