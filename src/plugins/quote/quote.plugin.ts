@@ -1,3 +1,5 @@
+import { tool } from "ai";
+import { z } from "zod";
 import type { Plugin } from "../plugin.interface.js";
 import type { AgentTools } from "../../agent/types.js";
 import type { AttachmentStore } from "../../domain/ports/attachment-store.js";
@@ -9,6 +11,15 @@ import { createListQuotesTool } from "./tools/list-quotes.tool.js";
 import { createQuoteAgent } from "./quote.agent.js";
 import { QuoteStrategyRegistry } from "./strategies/index.js";
 import { logger } from "../../shared/logger.js";
+
+/** Creates a tool that always returns a fixed message. Used when quotes aren't configured. */
+function stubTool(message: string) {
+  return tool({
+    description: message,
+    inputSchema: z.object({}),
+    execute: async () => ({ available: false, message }),
+  });
+}
 
 export interface QuotePluginDeps {
   attachmentStore: AttachmentStore;
@@ -57,7 +68,12 @@ export class QuotePlugin implements Plugin {
   async resolveSystemForRequest(orgId: string, lang = "es"): Promise<string | null> {
     try {
       const org = await this.organizationRepo.findByOrgId(orgId);
-      if (!org?.businessLogicUrl || !org.businessLogicApiKey) return null;
+      if (!org?.businessLogicUrl || !org.businessLogicApiKey) {
+        return "Esta organización no tiene un servicio de presupuestos configurado. " +
+          "Si el usuario pide generar un presupuesto, explícale que esta funcionalidad " +
+          "no está disponible y que debe contactar con el administrador. " +
+          "Solo puedes consultar presupuestos anteriores con listQuotes.";
+      }
 
       const strategy = await this.strategyRegistry.resolveForOrg(org);
       const instructions = strategy.getAgentInstructions(lang);
@@ -81,7 +97,14 @@ export class QuotePlugin implements Plugin {
   async resolveToolsForRequest(orgId: string): Promise<AgentTools | null> {
     try {
       const org = await this.organizationRepo.findByOrgId(orgId);
-      if (!org?.businessLogicUrl || !org.businessLogicApiKey) return null;
+      if (!org?.businessLogicUrl || !org.businessLogicApiKey) {
+        logger.info({ orgId }, "[QuotePlugin] no businessLogicUrl — returning stub tools");
+        return {
+          calculateBudget: stubTool("La generación de presupuestos no está configurada para esta organización."),
+          listCatalog: stubTool("El catálogo no está disponible."),
+          listQuotes: this.tools["listQuotes"]!,
+        };
+      }
 
       const strategy = await this.strategyRegistry.resolveForOrg(org);
 

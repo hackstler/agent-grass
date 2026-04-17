@@ -255,8 +255,15 @@ export function createWebhookController(
 
       try {
         await gmailService.sendEmail(user.id, draft.to, draft.subject, draft.body, attachment);
-        await whatsapp.sendText(phoneNumberId, customerPhone, `Email enviado correctamente a ${draft.to}.`);
+        const confirmMsg = `Email enviado correctamente a ${draft.to}.`;
+        await whatsapp.sendText(phoneNumberId, customerPhone, confirmMsg);
         logger.info({ draftId, to: draft.to }, "Email sent via WhatsApp button confirmation");
+
+        // Persist button action in conversation history so the agent knows the email was sent
+        const conversationId = await convManager.resolveOrCreateForChannel(
+          `kapso:${customerPhone}`, user.id, `WhatsApp: ${customerPhone}`,
+        );
+        await convManager.persistMessages(conversationId, "[Confirmación: enviar email]", confirmMsg, {});
       } catch (err) {
         logger.error({ err, draftId }, "Failed to send email from WhatsApp button");
         await whatsapp.sendText(phoneNumberId, customerPhone, "No se pudo enviar el email. Inténtalo de nuevo.");
@@ -265,7 +272,17 @@ export function createWebhookController(
     }
 
     if (buttonId.startsWith("cancel_email:")) {
-      await whatsapp.sendText(phoneNumberId, customerPhone, "Email cancelado.");
+      const cancelMsg = "Email cancelado.";
+      await whatsapp.sendText(phoneNumberId, customerPhone, cancelMsg);
+
+      // Persist cancellation so the agent knows the email was cancelled
+      const user = await userRepo.findByPhone(customerPhone);
+      if (user) {
+        const conversationId = await convManager.resolveOrCreateForChannel(
+          `kapso:${customerPhone}`, user.id, `WhatsApp: ${customerPhone}`,
+        );
+        await convManager.persistMessages(conversationId, "[Confirmación: cancelar email]", cancelMsg, {});
+      }
       return;
     }
 
